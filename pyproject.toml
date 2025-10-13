@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pytree"
+version = "1.0.0"
+description = "A simple and intuitive Python library for creating and manipulating tree data structures"
+readme = "README.md"
+requires-python = ">=3.6"
+license = {text = "MIT"}
+authors = [
+    {name = "Zhenning Zhao", email = "znzhao@utexas.edu"}
+]
+keywords = ["tree", "data-structure", "node", "hierarchy", "graph"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Data Structures",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/pytree"
+"Bug Reports" = "https://github.com/yourusername/pytree/issues"
+"Source" = "https://github.com/yourusername/pytree"
+"Documentation" = "https://github.com/yourusername/pytree#readme"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pytree*"]
+
+[tool.pytest.ini_options]
+testpaths = ["test_pytree.py"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
