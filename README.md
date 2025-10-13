@@ -370,22 +370,23 @@ draw_tree(root_node, key="name")
 ```
 
 ## Examples
-/**
- * This function performs the specified operation.
- *
- * ## Usage
- * You can run quick examples and examples from the package to see how this function works in practice.
- *
- * ## Parameters
- * - param1: Description of the first parameter.
- * - param2: Description of the second parameter.
- *
- * ## Returns
- * Description of the return value.
- *
- * ## Examples
- * See package documentation and quick examples for usage scenarios.
- */
+
+The PyTree package includes ready-to-run example files that demonstrate all the key features:
+
+### Running the Examples
+
+**Quick Examples** - Fast overview of main features:
+```bash
+python -m pytree.quick_examples
+```
+
+**Comprehensive Examples** - Detailed demonstrations:
+```bash
+python -m pytree.examples
+```
+
+These example files show practical usage patterns and can serve as templates for your own projects.
+
 ### File System Tree
 
 ```python
