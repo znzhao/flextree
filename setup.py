@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="pytree",
-    version="1.0.0",
+    version="0.1.0",
     author="Zhenning Zhao",
     author_email="znzhao@utexas.edu",
     description="A simple and intuitive Python library for creating and manipulating tree data structures",
@@ -35,4 +35,5 @@ setup(
         "Source": "https://github.com/yourusername/pytree",
         "Documentation": "https://github.com/yourusername/pytree#readme",
     },
+
 )
