@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pytree"
-version = "1.0.0"
+version = "0.1.0"
 description = "A simple and intuitive Python library for creating and manipulating tree data structures"
 readme = "README.md"
 requires-python = ">=3.6"
@@ -43,4 +43,5 @@ include = ["pytree*"]
 testpaths = ["test_pytree.py"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
+
 python_functions = ["test_*"]
