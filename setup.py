@@ -4,11 +4,11 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name="pytree",
-    version="0.1.0",
+    name="simple-pytree",
+    version="0.1.5",
     author="Zhenning Zhao",
-    author_email="znzhao@utexas.edu",
-    description="A simple and intuitive Python library for creating and manipulating tree data structures",
+    author_email="znzhaopersonal@gmail.com",
+    description="Simple PyTree - A simple and intuitive Python library for creating and manipulating tree data structures",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/znzhao/pytree",

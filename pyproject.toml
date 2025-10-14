@@ -3,14 +3,14 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pytree"
-version = "0.1.0"
-description = "A simple and intuitive Python library for creating and manipulating tree data structures"
+name = "simple-pytree"
+version = "0.1.5"
+description = "Simple PyTree - A simple and intuitive Python library for creating and manipulating tree data structures"
 readme = "README.md"
 requires-python = ">=3.6"
 license = {text = "MIT"}
 authors = [
-    {name = "Zhenning Zhao", email = "znzhao@utexas.edu"}
+    {name = "Zhenning Zhao", email = "znzhaopersonal@gmail.com"}
 ]
 keywords = ["tree", "data-structure", "node", "hierarchy", "graph"]
 classifiers = [
@@ -26,7 +26,6 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Topic :: Software Development :: Libraries :: Python Modules",
-    "Topic :: Data Structures",
 ]
 
 [project.urls]
