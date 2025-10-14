@@ -1,0 +1,10 @@
+LICENSE
+MANIFEST.in
+README.md
+pyproject.toml
+requirements.txt
+setup.py
+pytree.egg-info/PKG-INFO
+pytree.egg-info/SOURCES.txt
+pytree.egg-info/dependency_links.txt
+pytree.egg-info/top_level.txt

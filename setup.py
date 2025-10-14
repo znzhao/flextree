@@ -35,5 +35,4 @@ setup(
         "Source": "https://github.com/yourusername/pytree",
         "Documentation": "https://github.com/yourusername/pytree#readme",
     },
-
 )

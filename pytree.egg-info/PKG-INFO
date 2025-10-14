@@ -1,3 +1,37 @@
+Metadata-Version: 2.4
+Name: pytree
+Version: 0.1.0
+Summary: A simple and intuitive Python library for creating and manipulating tree data structures
+Home-page: https://github.com/znzhao/pytree
+Author: Zhenning Zhao
+Author-email: Zhenning Zhao <znzhao@utexas.edu>
+License: MIT
+Project-URL: Homepage, https://github.com/znzhao/pytree
+Project-URL: Bug Reports, https://github.com/znzhao/pytree/issues
+Project-URL: Source, https://github.com/znzhao/pytree
+Project-URL: Documentation, https://github.com/znzhao/pytree#readme
+Keywords: tree,data-structure,node,hierarchy,graph
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.6
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: Data Structures
+Requires-Python: >=3.6
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Dynamic: author
+Dynamic: home-page
+Dynamic: license-file
+Dynamic: requires-python
+
 # PyTree
 
 A simple and intuitive Python library for creating and manipulating tree data structures.
