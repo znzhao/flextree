@@ -3,9 +3,9 @@ requires = ["setuptools>=45", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "simple-pytree"
-version = "0.1.5"
-description = "Simple PyTree - A simple and intuitive Python library for creating and manipulating tree data structures"
+name = "flextree"
+version = "0.1.7"
+description = "FlexTree - A flexible and intuitive Python library for creating and manipulating tree data structures"
 readme = "README.md"
 requires-python = ">=3.6"
 license = {text = "MIT"}
@@ -29,17 +29,17 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/znzhao/pytree"
-"Bug Reports" = "https://github.com/znzhao/pytree/issues"
-"Source" = "https://github.com/znzhao/pytree"
-"Documentation" = "https://github.com/znzhao/pytree#readme"
+Homepage = "https://github.com/znzhao/flextree"
+"Bug Reports" = "https://github.com/znzhao/flextree/issues"
+"Source" = "https://github.com/znzhao/flextree"
+"Documentation" = "https://github.com/znzhao/flextree#readme"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["pytree*"]
+include = ["flextree*"]
 
 [tool.pytest.ini_options]
-testpaths = ["test_pytree.py"]
+testpaths = ["test_flextree.py"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 

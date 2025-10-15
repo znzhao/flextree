@@ -4,14 +4,14 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name="simple-pytree",
-    version="0.1.5",
+    name="flextree",
+    version="0.1.7",
     author="Zhenning Zhao",
     author_email="znzhaopersonal@gmail.com",
-    description="Simple PyTree - A simple and intuitive Python library for creating and manipulating tree data structures",
+    description="FlexTree - A flexible and intuitive Python library for creating and manipulating tree data structures",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/znzhao/pytree",
+    url="https://github.com/znzhao/flextree",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 5 - Production/Stable",
