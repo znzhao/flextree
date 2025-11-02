@@ -5,9 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.8] - 2025-11-01
+
+### Added
+- **NEW**: Copy and Deep Copy functionality for TreeNode and Tree classes
+- `TreeNode.copy()`: Create shallow copy of node without children or parent relationships
+- `TreeNode.deepcopy()`: Create deep copy of node with entire subtree and independent content
+- `Tree.copy()`: Create shallow copy of tree (root node only, no children)
+- `Tree.deepcopy()`: Create deep copy of entire tree structure with full independence
+- Comprehensive test coverage for all copy operations in `test_flextree.py`
+- Copy examples and demonstrations in `examples.py`
+
+### Enhanced
+- Added `import copy` module support for deep copying functionality
+- Deep copy ensures complete independence of content and structure
+- Shallow copy provides fast duplication with shared content references
+- Perfect for template systems, backup creation, and safe experimentation
+- Full backward compatibility maintained with existing code
+
+### Documentation
+- Updated README.md with comprehensive copy operations section
+- Added API documentation for new copy methods
+- Enhanced examples with practical copy use cases
+- Updated version to 0.1.8 in project metadata
+
+## [0.1.7] - 2025-10-31
+
+### Added
+- **NEW**: FlexTree JSON UI - A complete graphical user interface
+- TreeViewerPanel class for interactive tree structure display
+- InfoViewerPanel class for detailed node information viewing
+- FlexTreeUI main class with resizable left/right panels
+- Support for JSON file loading and saving through GUI
+- Comprehensive node information display (overview, content, statistics, children)
+- Sample tree creation function for demonstration
+- Menu system with File, View, and Help menus
+- Expandable/collapsible tree navigation
+- Real-time node selection and information updates
+
+### Enhanced
+- JSON import/export functionality integrated with GUI
+- Tree visualization with interactive exploration
+- Node statistics and content analysis tools
+
 ## [0.1.6] - 2025-10-14
 
 ### Changed
+- Cleaned up package imports in `__init__.py`
+- Removed `quick_examples` from imports to streamline API
+- Updated `__all__` list to include only core exports: `["TreeNode", "Tree", "draw_tree", "examples"]`
 - Maintained backward compatibility with all existing features
 - Prepared for future enhancements and optimizations
 - Consolidated changelog documentation

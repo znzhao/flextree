@@ -1,4 +1,5 @@
 import json
+import copy
 from typing import Any, Optional, List, Dict, Union
 
 class TreeNode:
@@ -244,6 +245,65 @@ class TreeNode:
             node.add_child(TreeNode.from_dict(child_data))
         return node
 
+    def copy(self) -> 'TreeNode':
+        """
+        Create a shallow copy of this node.
+        
+        This method creates a new TreeNode with the same name and content
+        (shallow copy of content), but without any children or parent relationships.
+        The content is shallow copied, meaning if the content is a mutable object,
+        changes to the original content will affect the copy.
+        
+        Returns:
+            TreeNode: A new TreeNode instance with the same name and shallow copied content
+            
+        Example:
+            >>> original = TreeNode("test", {"key": "value"})
+            >>> copy_node = original.copy()
+            >>> copy_node.name == original.name
+            True
+            >>> copy_node is original
+            False
+            >>> copy_node.content is original.content
+            True
+        """
+        return TreeNode(self.name, self.content)
+    
+    def deepcopy(self) -> 'TreeNode':
+        """
+        Create a deep copy of this node and its entire subtree.
+        
+        This method creates a new TreeNode with the same name and a deep copy
+        of the content, along with deep copies of all children. All parent-child
+        relationships are preserved in the copied tree. The content is deep copied,
+        meaning changes to the original content will not affect the copy.
+        
+        Returns:
+            TreeNode: A new TreeNode instance with deep copied content and children
+            
+        Example:
+            >>> original = TreeNode("root", {"data": [1, 2, 3]})
+            >>> child = TreeNode("child", "child content")
+            >>> original.add_child(child)
+            >>> deep_copy = original.deepcopy()
+            >>> deep_copy.name == original.name
+            True
+            >>> deep_copy is original
+            False
+            >>> deep_copy.content is original.content
+            False
+            >>> len(deep_copy.children) == len(original.children)
+            True
+        """
+        # Create new node with deep copied content
+        new_node = TreeNode(self.name, copy.deepcopy(self.content))
+        
+        # Deep copy all children and add them
+        for child in self.children:
+            new_node.add_child(child.deepcopy())
+        
+        return new_node
+
     def max_depth(self) -> int:
         """
         Calculate the maximum depth of the subtree rooted at this node.
@@ -333,13 +393,13 @@ class TreeNode:
         """
         return f"TreeNode(name={self.name}, children={len(self.children)})"
 
-    def draw(self, key: str = "definition"):
+    def draw(self, key: str = None):
         """
         Print an ASCII art representation of the tree structure.
         
         Args:
             key (str, optional): The dictionary key to display for
-                               dictionary content. Defaults to "definition".
+                               dictionary content. Defaults to None.
         """
         draw_tree(self, key=key)
 
@@ -633,13 +693,13 @@ class Tree:
         """
         return self.root.max_width()
     
-    def draw(self, key: str = "definition"):
+    def draw(self, key: str = None):
         """
         Print an ASCII art representation of the tree structure.
         
         Args:
             key (str, optional): The dictionary key to display for
-                               dictionary content. Defaults to "definition".
+                               dictionary content. Defaults to None.
         """
         draw_tree(self.root, key=key)
 
@@ -677,8 +737,60 @@ class Tree:
             Dict: A dictionary representation of the tree
         """
         return self.root.to_dict()
+    
+    def copy(self) -> 'Tree':
+        """
+        Create a shallow copy of the tree.
+        
+        This method creates a new Tree with a shallow copy of the root node.
+        Only the root node is shallow copied (same name and shallow copied content),
+        but no children are included in the copy. The original tree structure
+        is not duplicated.
+        
+        Returns:
+            Tree: A new Tree instance with a shallow copy of the root node only
+            
+        Example:
+            >>> root = TreeNode("root", {"key": "value"})
+            >>> child = TreeNode("child", "content")
+            >>> root.add_child(child)
+            >>> original_tree = Tree(root)
+            >>> copied_tree = original_tree.copy()
+            >>> copied_tree.root.name == original_tree.root.name
+            True
+            >>> len(copied_tree.root.children)
+            0
+        """
+        return Tree(self.root.copy())
+    
+    def deepcopy(self) -> 'Tree':
+        """
+        Create a deep copy of the entire tree.
+        
+        This method creates a new Tree with a deep copy of the root node
+        and its entire subtree. All content is deep copied and all parent-child
+        relationships are preserved in the new tree. Changes to the original
+        tree will not affect the copied tree.
+        
+        Returns:
+            Tree: A new Tree instance with a complete deep copy of the tree structure
+            
+        Example:
+            >>> root = TreeNode("root", {"data": [1, 2, 3]})
+            >>> child = TreeNode("child", "child content")
+            >>> root.add_child(child)
+            >>> original_tree = Tree(root)
+            >>> deep_copied_tree = original_tree.deepcopy()
+            >>> deep_copied_tree.root is original_tree.root
+            False
+            >>> deep_copied_tree.root.content is original_tree.root.content
+            False
+            >>> len(deep_copied_tree.root.children) == len(original_tree.root.children)
+            True
+        """
+        return Tree(self.root.deepcopy())
 
-def draw_tree(node: TreeNode, prefix: str = "", is_last: bool = True, key: str = "definition"):
+def draw_tree(node: TreeNode, prefix: str = "", is_last: bool = True, key: str = None):
     """
     Print an ASCII art representation of a tree structure.
     
@@ -696,7 +808,7 @@ def draw_tree(node: TreeNode, prefix: str = "", is_last: bool = True, key: str =
         key (str, optional): The dictionary key to display for dictionary content.
                            If the node's content is a dictionary containing this key,
                            that value will be displayed instead of the entire dictionary.
-                           Defaults to "definition".
+                           Defaults to None.
                                 
     Example:
         >>> root = TreeNode("Company", "Acme Corp")

@@ -263,6 +263,100 @@ class TestTreeNode(unittest.TestCase):
         finally:
             sys.stdout = old_stdout
 
+    def test_copy(self):
+        """Test shallow copy of TreeNode."""
+        # Test with simple content
+        original = TreeNode("test", "simple content")
+        copied = original.copy()
+        
+        # Should have same name and content
+        self.assertEqual(copied.name, original.name)
+        self.assertEqual(copied.content, original.content)
+        
+        # Should be different objects
+        self.assertIsNot(copied, original)
+        
+        # Should have no children or parent
+        self.assertEqual(len(copied.children), 0)
+        self.assertIsNone(copied.parent)
+        
+        # Test with mutable content (shallow copy behavior)
+        mutable_content = {"key": "value", "list": [1, 2, 3]}
+        original_mutable = TreeNode("mutable", mutable_content)
+        copied_mutable = original_mutable.copy()
+        
+        # Content should be the same object (shallow copy)
+        self.assertIs(copied_mutable.content, original_mutable.content)
+        
+        # Modifying content should affect both
+        original_mutable.content["new_key"] = "new_value"
+        self.assertEqual(copied_mutable.content["new_key"], "new_value")
+    
+    def test_deepcopy(self):
+        """Test deep copy of TreeNode and its subtree."""
+        # Create a tree structure with mutable content
+        root_content = {"data": [1, 2, 3], "info": "root"}
+        original = TreeNode("root", root_content)
+        
+        child_content = {"child_data": {"nested": "value"}}
+        child = TreeNode("child", child_content)
+        original.add_child(child)
+        
+        grandchild = TreeNode("grandchild", "gc_content")
+        child.add_child(grandchild)
+        
+        # Deep copy the tree
+        deep_copied = original.deepcopy()
+        
+        # Should have same structure
+        self.assertEqual(deep_copied.name, original.name)
+        self.assertEqual(deep_copied.content, original.content)
+        self.assertEqual(len(deep_copied.children), len(original.children))
+        
+        # But should be different objects
+        self.assertIsNot(deep_copied, original)
+        self.assertIsNot(deep_copied.content, original.content)
+        
+        # Children should also be deep copied
+        copied_child = deep_copied.children[0]
+        original_child = original.children[0]
+        
+        self.assertEqual(copied_child.name, original_child.name)
+        self.assertEqual(copied_child.content, original_child.content)
+        self.assertIsNot(copied_child, original_child)
+        self.assertIsNot(copied_child.content, original_child.content)
+        
+        # Parent relationships should be correct
+        self.assertEqual(copied_child.parent, deep_copied)
+        self.assertIsNot(copied_child.parent, original)
+        
+        # Grandchildren should also be deep copied
+        copied_grandchild = copied_child.children[0]
+        original_grandchild = original_child.children[0]
+        
+        self.assertEqual(copied_grandchild.name, original_grandchild.name)
+        self.assertEqual(copied_grandchild.content, original_grandchild.content)
+        self.assertIsNot(copied_grandchild, original_grandchild)
+        self.assertEqual(copied_grandchild.parent, copied_child)
+        
+        # Modifying original should not affect copy
+        original.content["data"].append(4)
+        self.assertEqual(len(deep_copied.content["data"]), 3)
+        
+        original_child.content["child_data"]["nested"] = "modified"
+        self.assertEqual(copied_child.content["child_data"]["nested"], "value")
+    
+    def test_deepcopy_empty_node(self):
+        """Test deep copy of node with no children."""
+        original = TreeNode("single", {"test": "data"})
+        copied = original.deepcopy()
+        
+        self.assertEqual(copied.name, original.name)
+        self.assertEqual(copied.content, original.content)
+        self.assertIsNot(copied, original)
+        self.assertIsNot(copied.content, original.content)
+        self.assertEqual(len(copied.children), 0)
+
 
 class TestTree(unittest.TestCase):
     
@@ -607,6 +701,121 @@ class TestTree(unittest.TestCase):
         self.assertEqual(len(tree.root.children), 1)
         self.assertEqual(tree.root.children[0].name, 'child')
         self.assertEqual(tree.root.children[0].content, 'child content')
+
+    def test_tree_copy(self):
+        """Test shallow copy of Tree."""
+        # Add children to the original tree
+        child1 = TreeNode("child1", "content1")
+        child2 = TreeNode("child2", {"data": [1, 2, 3]})
+        self.tree.insert("root", child1)
+        self.tree.insert("root", child2)
+        
+        # Create shallow copy
+        copied_tree = self.tree.copy()
+        
+        # Trees should be different objects
+        self.assertIsNot(copied_tree, self.tree)
+        self.assertIsNot(copied_tree.root, self.tree.root)
+        
+        # Root should have same name and content (but shallow copied)
+        self.assertEqual(copied_tree.root.name, self.tree.root.name)
+        self.assertEqual(copied_tree.root.content, self.tree.root.content)
+        
+        # But copied tree should have no children (shallow copy)
+        self.assertEqual(len(copied_tree.root.children), 0)
+        self.assertEqual(len(self.tree.root.children), 2)
+        
+        # Content should be same object for simple content
+        self.assertIs(copied_tree.root.content, self.tree.root.content)
+    
+    def test_tree_deepcopy(self):
+        """Test deep copy of Tree."""
+        # Create a tree with complex structure and mutable content
+        root_data = {"metadata": {"created": "2023-01-01"}, "values": [1, 2, 3]}
+        self.tree.root.content = root_data
+        
+        child1 = TreeNode("engineering", {"team_size": 5, "projects": ["A", "B"]})
+        child2 = TreeNode("marketing", {"budget": 10000})
+        grandchild = TreeNode("backend", {"languages": ["Python", "Go"]})
+        
+        self.tree.insert("root", child1)
+        self.tree.insert("root", child2)
+        self.tree.insert("engineering", grandchild)
+        
+        # Create deep copy
+        deep_copied_tree = self.tree.deepcopy()
+        
+        # Trees should be different objects
+        self.assertIsNot(deep_copied_tree, self.tree)
+        self.assertIsNot(deep_copied_tree.root, self.tree.root)
+        
+        # Structure should be the same
+        self.assertEqual(deep_copied_tree.root.name, self.tree.root.name)
+        self.assertEqual(deep_copied_tree.root.content, self.tree.root.content)
+        self.assertEqual(len(deep_copied_tree.root.children), len(self.tree.root.children))
+        
+        # Content should be different objects (deep copied)
+        self.assertIsNot(deep_copied_tree.root.content, self.tree.root.content)
+        
+        # Children should be deep copied
+        original_eng = self.tree.root.get_child("engineering")
+        copied_eng = deep_copied_tree.root.get_child("engineering")
+        
+        self.assertIsNotNone(original_eng)
+        self.assertIsNotNone(copied_eng)
+        self.assertIsNot(copied_eng, original_eng)
+        self.assertEqual(copied_eng.content, original_eng.content)
+        self.assertIsNot(copied_eng.content, original_eng.content)
+        
+        # Parent relationships should be correct
+        self.assertEqual(copied_eng.parent, deep_copied_tree.root)
+        self.assertIsNot(copied_eng.parent, self.tree.root)
+        
+        # Grandchildren should also be deep copied
+        original_backend = original_eng.get_child("backend")
+        copied_backend = copied_eng.get_child("backend")
+        
+        self.assertIsNotNone(original_backend)
+        self.assertIsNotNone(copied_backend)
+        self.assertIsNot(copied_backend, original_backend)
+        self.assertEqual(copied_backend.content, original_backend.content)
+        self.assertIsNot(copied_backend.content, original_backend.content)
+        
+        # Modifying original should not affect copy
+        self.tree.root.content["values"].append(4)
+        self.assertEqual(len(deep_copied_tree.root.content["values"]), 3)
+        
+        original_eng.content["projects"].append("C")
+        self.assertEqual(len(copied_eng.content["projects"]), 2)
+        
+        # Test tree operations work independently
+        new_child = TreeNode("hr", "Human Resources")
+        deep_copied_tree.insert("root", new_child)
+        
+        self.assertEqual(len(deep_copied_tree.root.children), 3)
+        self.assertEqual(len(self.tree.root.children), 2)
+        self.assertIsNone(self.tree.root.get_child("hr"))
+        self.assertIsNotNone(deep_copied_tree.root.get_child("hr"))
+    
+    def test_copy_with_none_content(self):
+        """Test copying nodes with None content."""
+        original = TreeNode("test", None)
+        child = TreeNode("child", None)
+        original.add_child(child)
+        
+        # Test shallow copy
+        shallow = original.copy()
+        self.assertEqual(shallow.name, "test")
+        self.assertIsNone(shallow.content)
+        self.assertEqual(len(shallow.children), 0)
+        
+        # Test deep copy
+        deep = original.deepcopy()
+        self.assertEqual(deep.name, "test")
+        self.assertIsNone(deep.content)
+        self.assertEqual(len(deep.children), 1)
+        self.assertEqual(deep.children[0].name, "child")
+        self.assertIsNone(deep.children[0].content)
 
 class TestDrawTree(unittest.TestCase):
     

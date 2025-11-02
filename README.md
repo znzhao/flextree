@@ -9,6 +9,8 @@ A flexible and intuitive Python library for creating and manipulating tree data 
 
 - **TreeNode**: Individual nodes with name, content, and parent-child relationships
 - **Tree**: Complete tree structure with operations for insertion, deletion, and modification
+- **FlexTreeUI**: Full-featured graphical user interface for interactive tree exploration and editing
+- **Copy Operations**: Shallow and deep copy functionality for nodes and trees
 - **JSON Serialization**: Save and load trees to/from JSON files
 - **Tree Visualization**: ASCII art tree drawing functionality
 - **Flexible Content**: Store any Python object as node content
@@ -146,6 +148,253 @@ print(f"Max width: {company_tree.max_width()}")
 print(f"Node count: {company_tree.count()}")
 # Get node summary
 print(company_tree.summary())
+```
+
+### Copy Operations
+
+FlexTree supports both shallow and deep copy operations for TreeNodes and Trees, enabling safe duplication and template creation.
+
+```python
+# Shallow copy - copies node without children
+original = TreeNode("project", {"status": "active", "tasks": [1, 2, 3]})
+child = TreeNode("phase1", "Development")
+original.add_child(child)
+
+shallow_copy = original.copy()
+print(f"Original has {len(original.children)} children")      # 1
+print(f"Shallow copy has {len(shallow_copy.children)} children")  # 0
+print(f"Same content object: {shallow_copy.content is original.content}")  # True
+
+# Deep copy - copies node and entire subtree with independent content
+deep_copy = original.deepcopy()
+print(f"Deep copy has {len(deep_copy.children)} children")   # 1
+print(f"Same content object: {deep_copy.content is original.content}")    # False
+
+# Modifying original won't affect deep copy
+original.content["tasks"].append(4)
+print(f"Original tasks: {original.content['tasks']}")        # [1, 2, 3, 4]
+print(f"Deep copy tasks: {deep_copy.content['tasks']}")      # [1, 2, 3]
+
+# Tree copy operations
+tree = Tree(original)
+tree_shallow = tree.copy()       # Only root node, no children
+tree_deep = tree.deepcopy()      # Complete tree structure
+
+# Practical use case - Template system
+template = TreeNode("project_template", {"version": "1.0"})
+template.add_child(TreeNode("src", {"files": []}))
+template.add_child(TreeNode("tests", {"coverage": 0}))
+
+# Create independent projects from template
+project_a = template.deepcopy()
+project_a.name = "ProjectA"
+project_a.content["version"] = "2.0"
+
+project_b = template.deepcopy()
+project_b.get_child("src").content["files"] = ["main.py"]
+
+# Each project is completely independent
+print(f"Template version: {template.content['version']}")     # 1.0
+print(f"Project A version: {project_a.content['version']}")   # 2.0
+```
+
+## Graphical User Interface (FlexTreeUI)
+
+FlexTree includes a powerful graphical user interface for interactive tree exploration, editing, and visualization. The GUI provides a comprehensive environment for working with tree structures visually.
+
+### Launching the GUI
+
+```python
+from flextree import FlexTreeUI
+
+# Launch with empty UI (create new or load existing trees)
+ui = FlexTreeUI()
+ui.run()
+
+# Launch with an existing tree
+from flextree import TreeNode, Tree, FlexTreeUI
+root = TreeNode("Company", "Acme Corp")
+engineering = TreeNode("Engineering", "Tech Department")
+root.add_child(engineering)
+tree = Tree(root)
+
+ui = FlexTreeUI(tree)
+ui.run()
+
+# Or launch standalone
+python -m flextree.jsonui
+```
+
+### GUI Features
+
+#### **Two-Panel Layout**
+- **Left Panel**: Interactive tree structure viewer with expandable/collapsible nodes
+- **Right Panel**: Detailed node information with tabbed interface
+
+#### **Tree Viewer Panel (Left)**
+- **Hierarchical Display**: Visual tree structure with expand/collapse functionality
+- **Navigation Controls**: 
+  - Expand All / Collapse All buttons
+  - Right-click context menu for node operations
+- **Interactive Selection**: Click any node to view detailed information
+- **Keyboard Navigation**: Standard tree navigation with arrow keys
+
+#### **Information Panel (Right)**
+The right panel contains three tabs for comprehensive node analysis:
+
+**1. Overview Tab**
+- Node properties (name, parent, children count, depth, etc.)
+- Tree statistics and structural information
+- Double-click node name to rename (with validation)
+
+**2. Content Tab**
+- **View Mode**: Read-only display of node content
+- **Edit Mode**: Interactive editing with type-specific interfaces
+  - **Text Editor**: For strings and simple content
+  - **Table Editor**: For dictionaries and lists of dictionaries
+  - **Structured Editing**: Add/remove items, edit keys and values
+- **Content Type Support**: Automatic detection and appropriate display
+- **Save/Cancel**: Commit or revert changes
+
+**3. Children Tab**
+- List of all child nodes with their basic information
+- Quick navigation to child nodes
+
+#### **File Operations**
+- **New**: Create a new tree structure
+- **Open**: Load tree from JSON file
+- **Save**: Export tree to JSON file
+- **Sample Trees**: Generate example trees for exploration
+
+#### **Advanced Editing Features**
+
+**Cut/Copy/Paste Operations**:
+```
+Ctrl+X    - Cut selected node
+Ctrl+C    - Copy selected node  
+Ctrl+V    - Paste node as child of selected node
+Del       - Delete selected node
+Insert    - Add new child node
+```
+
+**Content Editing**:
+```
+Ctrl+L    - Toggle edit mode for node content
+Ctrl+Tab  - Switch between information tabs
+```
+
+**Undo/Redo System**:
+```
+Ctrl+Z    - Undo last action
+Ctrl+Y    - Redo last undone action
+```
+
+### Practical GUI Workflows
+
+#### **Creating a New Tree**
+1. Launch FlexTreeUI
+2. File → New → Create sample tree or start blank
+3. Use Insert key or right-click → "Insert New Node" to add nodes
+4. Edit node names by double-clicking in Overview tab
+5. Edit content in Content tab with Edit Mode enabled
+
+#### **Exploring Existing Trees**
+1. File → Open JSON to load a tree file
+2. Use Expand All/Collapse All for different view levels
+3. Click nodes to inspect detailed information
+4. Switch between Overview/Content/Children tabs
+5. Use search and navigation features
+
+#### **Editing Tree Content**
+1. Select the node you want to edit
+2. Go to Content tab
+3. Check "Edit Mode" to enable editing
+4. For dictionaries: Add/remove keys, edit values in table format
+5. For lists: Add/remove items, modify existing entries
+6. Click "Save Changes" to commit or "Cancel" to revert
+
+#### **Organizing Tree Structure**
+1. Use Cut (Ctrl+X) to remove nodes
+2. Navigate to new parent location
+3. Use Paste (Ctrl+V) to insert node in new location
+4. Use Insert key to add new nodes
+5. Use Delete key to remove unwanted nodes
+
+### Content Type Handling
+
+The GUI automatically detects and handles different content types:
+
+**Text Content**: Simple text editor with syntax highlighting
+```python
+node_content = "Simple string content"
+```
+
+**Dictionary Content**: Table editor with key-value pairs
+```python
+node_content = {
+    "name": "John Doe",
+    "role": "Developer",
+    "skills": ["Python", "JavaScript"]
+}
+```
+
+**List of Dictionaries**: Spreadsheet-like table editor
+```python
+node_content = [
+    {"name": "Alice", "age": 30, "city": "New York"},
+    {"name": "Bob", "age": 25, "city": "San Francisco"}
+]
+```
+
+### Keyboard Shortcuts Reference
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl+N` | New tree |
+| `Ctrl+O` | Open JSON file |
+| `Ctrl+S` | Save JSON file |
+| `Ctrl+X` | Cut node |
+| `Ctrl+C` | Copy node |
+| `Ctrl+V` | Paste node |
+| `Ctrl+Z` | Undo |
+| `Ctrl+Y` | Redo |
+| `Del` | Delete node |
+| `Insert` | Insert new node |
+| `Ctrl+L` | Toggle edit mode |
+| `Ctrl+Tab` | Switch info tabs |
+
+### Tips for Effective GUI Usage
+
+1. **Start Small**: Begin with simple trees and gradually add complexity
+2. **Use Context Menus**: Right-click for quick access to common operations
+3. **Leverage Edit Mode**: Enable edit mode for batch content modifications
+4. **Save Frequently**: Use Ctrl+S to save your work regularly
+5. **Explore Sample Trees**: Use built-in samples to learn GUI features
+6. **Undo/Redo**: Don't be afraid to experiment - you can always undo
+7. **Tab Navigation**: Use Ctrl+Tab to quickly switch between information views
+
+### Integration with Code
+
+The GUI integrates seamlessly with programmatic usage:
+
+```python
+from flextree import TreeNode, Tree, FlexTreeUI
+
+# Create tree programmatically
+root = TreeNode("Project", {"status": "active"})
+tasks = TreeNode("Tasks", [
+    {"task": "Design", "complete": True},
+    {"task": "Development", "complete": False}
+])
+root.add_child(tasks)
+
+# Launch GUI for interactive editing
+tree = Tree(root)
+ui = FlexTreeUI(tree)
+ui.run()
+
+# After GUI closes, tree contains any changes made
+print(f"Updated tree has {tree.count()} nodes")
 ```
 
 ## Tree Visualization with draw_tree
@@ -347,6 +596,8 @@ The `draw_tree` function uses these Unicode box-drawing characters:
 - `get_child(key: Union[str, int])`: Get child by name or index
 - `set_content(content: Any)`: Update node content
 - `get_subtree(name: str)`: Find and return subtree by node name
+- `copy()`: Create a shallow copy of the node (without children)
+- `deepcopy()`: Create a deep copy of the node and its entire subtree
 - `to_dict()`: Convert node and its subtree to dictionary
 - `from_dict(data: Dict)`: Create node from dictionary (static method)
 - `max_depth()`: Calculate maximum depth from this node
@@ -364,12 +615,52 @@ The `draw_tree` function uses these Unicode box-drawing characters:
 - `delete(node_name: str)`: Delete node by name
 - `alter(node_name: str, new_content: Any)`: Change content of specified node
 - `get(key: Union[str, int])`: Get subtree by name or index
+- `copy()`: Create a shallow copy of the tree (root node only)
+- `deepcopy()`: Create a deep copy of the entire tree structure
 - `save_json(filepath: str)`: Save tree to JSON file
 - `load_json(filepath: str)`: Load tree from JSON file (static method)
 - `max_depth()`: Get maximum depth of entire tree  
 - `max_width()`: Get maximum width of entire tree
 - `summary()`: Get formatted summary of the tree
 - `draw(key: str = "definition")`: Print ASCII art representation of the entire tree
+
+### FlexTreeUI
+
+#### Constructor
+- `FlexTreeUI(tree: Optional[Tree] = None)`: Create a graphical user interface for tree exploration
+
+#### Methods
+- `run()`: Start the GUI application (blocking call)
+- `load_tree(tree: Tree)`: Load a tree into the GUI
+- `_new_json_file()`: Create a new tree structure
+- `_load_json_file()`: Load tree from JSON file
+- `_save_json_file()`: Save current tree to JSON file
+
+#### Features
+- **Interactive Tree Viewer**: Expandable/collapsible tree structure display
+- **Node Information Panel**: Tabbed interface showing overview, content, and children
+- **Content Editing**: Visual editing of node content with type-specific editors
+- **Clipboard Operations**: Cut, copy, paste nodes with full undo/redo support
+- **File Operations**: Create, open, save JSON files
+- **Keyboard Shortcuts**: Full keyboard navigation and editing support
+
+#### Usage Examples
+```python
+# Launch empty GUI
+from flextree import FlexTreeUI
+ui = FlexTreeUI()
+ui.run()
+
+# Launch with existing tree
+from flextree import TreeNode, Tree, FlexTreeUI
+root = TreeNode("root", "content")
+tree = Tree(root)
+ui = FlexTreeUI(tree)
+ui.run()
+
+# Standalone execution
+python -m flextree.jsonui
+```
 
 ### Utility Functions
 
@@ -409,8 +700,17 @@ The Flex Tree package includes ready-to-run example files that demonstrate all t
 ### Running the Examples
 
 ```python
+# Run interactive code examples
 from flextree import examples
 examples()
+
+# Launch the graphical user interface
+from flextree import FlexTreeUI
+ui = FlexTreeUI()
+ui.run()
+
+# Or run GUI from command line
+python -m flextree.jsonui
 ```
 
 ## Requirements
@@ -431,6 +731,34 @@ examples()
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Changelog
+
+### Version 0.1.8
+- **New Feature**: Added copy and deep copy functionality for TreeNode and Tree classes
+- `TreeNode.copy()`: Create shallow copy of node without children
+- `TreeNode.deepcopy()`: Create deep copy of node with entire subtree 
+- `Tree.copy()`: Create shallow copy of tree (root node only)
+- `Tree.deepcopy()`: Create deep copy of entire tree structure
+- Deep copy ensures complete independence - content and structure are fully duplicated
+- Shallow copy provides fast duplication with shared content references
+- Added comprehensive test coverage for all copy operations
+- Enhanced examples with copy operation demonstrations
+- Perfect for template systems, backup creation, and safe experimentation
+- Maintains full backward compatibility with existing code
+
+### Version 0.1.7
+- **New Feature**: FlexTree JSON UI - A complete graphical user interface
+- TreeViewerPanel class for interactive tree structure display
+- InfoViewerPanel class for detailed node information viewing
+- FlexTreeUI main class with resizable left/right panels
+- Support for JSON file loading and saving through GUI
+- Comprehensive node information display (overview, content, statistics, children)
+- Sample tree creation function for demonstration
+- Menu system with File, View, and Help menus
+- Expandable/collapsible tree navigation
+- Real-time node selection and information updates
+- JSON import/export functionality integrated with GUI
+- Tree visualization with interactive exploration
+- Node statistics and content analysis tools
 
 ### Version 0.1.6
 - Maintained backward compatibility with all existing features

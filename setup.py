@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="flextree",
-    version="0.1.7",
+    version="0.1.8",
     author="Zhenning Zhao",
     author_email="znzhaopersonal@gmail.com",
     description="FlexTree - A flexible and intuitive Python library for creating and manipulating tree data structures",
@@ -31,8 +31,8 @@ setup(
     python_requires=">=3.6",
     keywords="tree, data-structure, node, hierarchy, graph",
     project_urls={
-        "Bug Reports": "https://github.com/yourusername/pytree/issues",
-        "Source": "https://github.com/yourusername/pytree",
-        "Documentation": "https://github.com/yourusername/pytree#readme",
+        "Bug Reports": "https://github.com/znzhao/flextree/issues",
+        "Source": "https://github.com/znzhao/flextree",
+        "Documentation": "https://github.com/znzhao/flextree#readme",
     },
 )
