@@ -614,11 +614,18 @@ class InfoViewerPanel(ttk.Frame):
     def _toggle_edit_mode(self):
         """Toggle edit mode on/off."""
         self.is_editing = self.edit_mode_var.get()
-        
-        if self.is_editing:
-            # Store original content for cancel functionality
-            self.original_content = self._deep_copy_content(self.current_node.content)
+        # Switch to Content tab when entering edit mode
+        self.notebook.select(1)  # Index 1 is the Content tab (Overview=0, Content=1, Children=2)
             
+        if self.is_editing:
+            # Record action for undo/redo before making changes
+            if hasattr(self, 'record_action'):
+                action_data = {'node_name': self.current_node.name, 'old_content': copy.deepcopy(self.original_content)}
+                self.record_action('content_edit', action_data)
+            
+            # Store original content for cancel functionality
+            self.original_content = self._deep_copy_content(self.current_node.content)            
+
             # Show edit buttons
             self.add_btn.pack(side=tk.LEFT, padx=(0, 5))
             self.remove_btn.pack(side=tk.LEFT, padx=(0, 5))
@@ -645,6 +652,11 @@ class InfoViewerPanel(ttk.Frame):
             
             # Update overview to reflect any unsaved changes when exiting edit mode
             self._update_overview()
+
+            messagebox.showinfo("Success", "Content updated successfully!")
+            # Complete the action recording (if callback is available)
+            if hasattr(self, 'complete_action'):
+                self.complete_action()
     
     def _deep_copy_content(self, content):
         """Create a deep copy of content for backup."""
@@ -663,11 +675,6 @@ class InfoViewerPanel(ttk.Frame):
             return
         
         try:
-            # Record action for undo/redo before making changes
-            if hasattr(self, 'record_action'):
-                action_data = {'node_name': self.current_node.name, 'old_content': copy.deepcopy(self.original_content)}
-                self.record_action('content_edit', action_data)
-            
             if self.content_display_mode == "text":
                 # Parse text content
                 text_content = self.content_text.get(1.0, tk.END).strip()
@@ -699,11 +706,13 @@ class InfoViewerPanel(ttk.Frame):
             self._update_overview()  # Update overview tab to reflect content changes
             self._update_children()  # Update children tab in case structure changed
             
+            # Notify that content has changed
+            if hasattr(self, 'content_changed_callback') and self.content_changed_callback:
+                self.content_changed_callback()
+            
             # Complete the action recording (if callback is available)
             if hasattr(self, 'complete_action'):
                 self.complete_action()
-            
-            messagebox.showinfo("Success", "Content updated successfully!")
             
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save changes:\n{str(e)}")
@@ -861,6 +870,10 @@ class InfoViewerPanel(ttk.Frame):
         """Set callback function to complete action recording for undo/redo."""
         self.complete_action = callback
     
+    def set_content_changed_callback(self, callback):
+        """Set callback function to notify when content changes."""
+        self.content_changed_callback = callback
+    
     def _clear_content(self):
         """Clear the current node content and set it to None."""
         if not self.current_node or not self.is_editing:
@@ -996,17 +1009,21 @@ class InfoViewerPanel(ttk.Frame):
         if not self.is_editing:
             return
         
-        item = self.content_table.selection()[0]
+        # Get the item under the mouse cursor for editing
+        row = self.content_table.identify_row(event.y)
         column = self.content_table.identify_column(event.x)
         
+        if not row:
+            return
+        
         if isinstance(self.current_node.content, dict):
-            self._edit_dict_item(item, column)
+            self._edit_dict_item(row, column)
         elif isinstance(self.current_node.content, list):
-            self._edit_list_item(item, column)
-    
-    def _edit_dict_item(self, item_id, column):
+            self._edit_list_item(row, column)
+
+    def _edit_dict_item(self, row, column):
         """Edit dictionary item."""
-        key = self.content_table.item(item_id, 'text')
+        key = self.content_table.item(row, 'text')
         if column == '#1':  # Value column
             current_value = self.current_node.content.get(key, "")
             dialog = EditValueDialog(self.content_container, str(current_value))
@@ -1029,11 +1046,11 @@ class InfoViewerPanel(ttk.Frame):
                 value = self.current_node.content.pop(key)
                 self.current_node.content[dialog.result] = value
                 self._update_content()
-    
-    def _edit_list_item(self, item_id, column):
+
+    def _edit_list_item(self, row, column):
         """Edit list item."""
         try:
-            index = int(self.content_table.item(item_id, 'text'))
+            index = int(self.content_table.item(row, 'text'))
             if isinstance(self.current_node.content[index], dict):
                 # Get column name
                 columns = ['#0'] + list(self.content_table['columns'])
@@ -1642,8 +1659,20 @@ class FlexTreeUI:
         # Initialize NewNode counter for unique naming
         self.new_node_counter = 0
         
+        # Initialize current file path for save/save as functionality
+        self.current_file_path = None
+        
+        # Initialize unsaved changes tracking
+        self.has_unsaved_changes = False
+        
         # Initialize action memory system for undo/redo
         self.action_memory = ActionMemorySystem(max_steps=20)
+        
+        # Search system
+        self.search_results = []
+        self.current_search_index = -1
+        self.search_dialog = None
+        self.replace_dialog = None
         
         self._setup_ui()
         
@@ -1655,7 +1684,8 @@ class FlexTreeUI:
         """Set up the main user interface."""
         # Create main window
         self.root = tk.Tk()
-        self.root.title("FlexTree JSON UI")
+        # Set initial title
+        self._update_window_title()
         self.root.geometry("1000x700")
         self.root.minsize(800, 500)
         
@@ -1683,6 +1713,7 @@ class FlexTreeUI:
         self.infoviewer.set_node_renamed_callback(self._on_node_renamed)
         self.infoviewer.set_action_recorder_callback(self._record_action_state)
         self.infoviewer.set_action_complete_callback(self._complete_action_state)
+        self.infoviewer.set_content_changed_callback(self._mark_as_changed)
         self.main_paned.add(self.infoviewer, weight=2)
         
         # Create menu bar
@@ -1696,6 +1727,9 @@ class FlexTreeUI:
         
         # Set initial pane positions
         self.root.after(100, self._set_initial_pane_position)
+        
+        # Setup window close protocol
+        self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
         
         # Initialize action status
         self._update_action_status()
@@ -1711,7 +1745,8 @@ class FlexTreeUI:
         file_menu.add_command(label="New", accelerator="Ctrl+N", command=self._new_json_file)
         file_menu.add_separator()
         file_menu.add_command(label="Open JSON...", accelerator="Ctrl+O", command=self._load_json_file)
-        file_menu.add_command(label="Save JSON...", accelerator="Ctrl+S", command=self._save_json_file)
+        file_menu.add_command(label="Save", accelerator="Ctrl+S", command=self._save_json_file)
+        file_menu.add_command(label="Save As...", accelerator="Ctrl+Shift+S", command=self._save_as_json_file)
         file_menu.add_separator()
         file_menu.add_command(label="Exit", command=self.root.quit)
         
@@ -1725,16 +1760,18 @@ class FlexTreeUI:
         edit_menu.add_command(label="Copy", accelerator="Ctrl+C", command=self._copy_node)
         edit_menu.add_command(label="Paste", accelerator="Ctrl+V", command=self._paste_node)
         edit_menu.add_separator()
-        edit_menu.add_command(label="Rename Node", accelerator="Ctrl+R", command=self._rename_node)
-        edit_menu.add_command(label="Toggle Edit Mode", accelerator="Ctrl+L", command=self._toggle_edit_mode)
-        edit_menu.add_separator()
         edit_menu.add_command(label="Insert New Node", accelerator="Ctrl+I", command=self._insert_new_node)
-        edit_menu.add_separator()
         edit_menu.add_command(label="Delete", accelerator="Del", command=self._delete_node)
+        edit_menu.add_separator()
+        edit_menu.add_command(label="Rename Node", accelerator="Ctrl+R", command=self._rename_node)
+        edit_menu.add_command(label="Toggle Edit Mode", accelerator="Ctrl+E", command=self._toggle_edit_mode)
         
         # View menu
         view_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="View", menu=view_menu)
+        view_menu.add_command(label="Find...", accelerator="Ctrl+F", command=self._open_search_dialog)
+        view_menu.add_command(label="Find and Replace...", accelerator="Ctrl+H", command=self._open_replace_dialog)
+        view_menu.add_separator()
         view_menu.add_command(label="Expand All", command=self.treeviewer._expand_all)
         view_menu.add_command(label="Collapse All", command=self.treeviewer._collapse_all)
         view_menu.add_separator()
@@ -1824,18 +1861,9 @@ class FlexTreeUI:
     
     def _new_json_file(self):
         """Create a new JSON file with a default root node."""
-        # Check if there are unsaved changes
-        if self.tree:
-            result = messagebox.askyesnocancel(
-                "New File",
-                "Create a new file? Any unsaved changes will be lost.\n\n"
-                "Yes: Create new file\n"
-                "No: Keep current file\n"
-                "Cancel: Cancel operation"
-            )
-            
-            if result is False or result is None:  # No or Cancel
-                return
+        # Check for unsaved changes first
+        if not self._check_unsaved_changes():
+            return
         
         try:
             # Create a new tree with a default root node
@@ -1845,8 +1873,17 @@ class FlexTreeUI:
             # Reset the NewNode counter
             self.new_node_counter = 0
             
+            # Clear current file path (new file hasn't been saved yet)
+            self.current_file_path = None
+            
+            # Mark as not having unsaved changes (new empty file)
+            self.has_unsaved_changes = False
+            
             # Load the new tree
             self.load_tree(new_tree)
+            
+            # Update window title
+            self._update_window_title()
             
             # Clear clipboard
             self.clipboard = []
@@ -1864,6 +1901,10 @@ class FlexTreeUI:
     
     def _load_json_file(self):
         """Load a tree from a JSON file."""
+        # Check for unsaved changes first
+        if not self._check_unsaved_changes():
+            return
+            
         filename = filedialog.askopenfilename(
             title="Load Tree from JSON",
             filetypes=[("JSON files", "*.json"), ("All files", "*.*")]
@@ -1873,13 +1914,37 @@ class FlexTreeUI:
                 tree = Tree.load_json(filename)
                 # Reset the NewNode counter when loading a file
                 self.new_node_counter = 0
+                # Set the current file path
+                self.current_file_path = filename
+                # Mark as saved (just loaded from file)
+                self.has_unsaved_changes = False
                 self.load_tree(tree)
+                # Update window title to show current file
+                self._update_window_title()
                 #messagebox.showinfo("Success", f"Tree loaded from {filename}")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to load JSON file:\n{str(e)}")
     
     def _save_json_file(self):
-        """Save the current tree to a JSON file."""
+        """Save the current tree. If no current file path, prompt for one."""
+        if not self.tree:
+            messagebox.showwarning("Warning", "No tree to save")
+            return
+        
+        # If we have a current file path, save directly to it
+        if self.current_file_path:
+            try:
+                self.tree.save_json(self.current_file_path)
+                self._mark_as_saved()
+                #messagebox.showinfo("Success", f"Tree saved to {self.current_file_path}")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save JSON file:\n{str(e)}")
+        else:
+            # No current file path, behave like "Save As"
+            self._save_as_json_file()
+    
+    def _save_as_json_file(self):
+        """Save the current tree to a new JSON file (always prompts for filename)."""
         if not self.tree:
             messagebox.showwarning("Warning", "No tree to save")
             return
@@ -1892,9 +1957,76 @@ class FlexTreeUI:
         if filename:
             try:
                 self.tree.save_json(filename)
+                # Update current file path
+                self.current_file_path = filename
+                # Mark as saved
+                self._mark_as_saved()
+                # Update window title to show current file
+                self._update_window_title()
                 #messagebox.showinfo("Success", f"Tree saved to {filename}")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to save JSON file:\n{str(e)}")
+    
+    def _update_window_title(self):
+        """Update the window title to reflect the current file and unsaved changes."""
+        unsaved_indicator = "*" if self.has_unsaved_changes else ""
+        
+        if self.current_file_path:
+            import os
+            filename = os.path.basename(self.current_file_path)
+            self.root.title(f"FlexTree JSON UI - {filename}{unsaved_indicator}")
+        else:
+            self.root.title(f"FlexTree JSON UI - Untitled{unsaved_indicator}")
+    
+    def _mark_as_changed(self):
+        """Mark the document as having unsaved changes."""
+        if not self.has_unsaved_changes:
+            self.has_unsaved_changes = True
+            self._update_window_title()
+    
+    def _mark_as_saved(self):
+        """Mark the document as saved (no unsaved changes)."""
+        if self.has_unsaved_changes:
+            self.has_unsaved_changes = False
+            self._update_window_title()
+    
+    def _check_unsaved_changes(self) -> bool:
+        """
+        Check for unsaved changes and prompt user to save.
+        
+        Returns:
+            True if it's safe to continue (no changes or user chose to discard)
+            False if user wants to cancel the operation
+        """
+        if not self.has_unsaved_changes:
+            return True
+        
+        # Check if there are unsaved changes in the info viewer as well
+        info_has_changes = (hasattr(self.infoviewer, '_has_unsaved_changes') and 
+                           self.infoviewer._has_unsaved_changes())
+        
+        if self.has_unsaved_changes or info_has_changes:
+            result = messagebox.askyesnocancel(
+                "Unsaved Changes",
+                "You have unsaved changes. Do you want to save them before continuing?",
+                default="yes"
+            )
+            
+            if result is True:  # Yes - save first
+                self._save_json_file()
+                # Check if save was successful (user didn't cancel save dialog)
+                return not self.has_unsaved_changes
+            elif result is False:  # No - discard changes
+                return True
+            else:  # Cancel
+                return False
+        
+        return True
+    
+    def _on_closing(self):
+        """Handle window closing event."""
+        if self._check_unsaved_changes():
+            self.root.destroy()
     
     def _reset_panel_sizes(self):
         """Reset panel sizes to default proportions."""
@@ -1943,6 +2075,8 @@ Created with FlexTree library."""
         self.root.bind('<Control-O>', lambda e: self._load_json_file())
         self.root.bind('<Control-s>', lambda e: self._save_json_file())
         self.root.bind('<Control-S>', lambda e: self._save_json_file())
+        self.root.bind('<Control-Shift-s>', lambda e: self._save_as_json_file())
+        self.root.bind('<Control-Shift-S>', lambda e: self._save_as_json_file())
         
         # Undo/Redo operations
         self.root.bind('<Control-z>', lambda e: self._undo_action())
@@ -1953,8 +2087,9 @@ Created with FlexTree library."""
         # Edit operations
         self.root.bind('<Control-r>', lambda e: self._rename_node())
         self.root.bind('<Control-R>', lambda e: self._rename_node())
-        self.root.bind('<Control-l>', lambda e: self._toggle_edit_mode())
-        self.root.bind('<Control-L>', lambda e: self._toggle_edit_mode())
+        self.root.bind('<F2>', lambda e: self._rename_node())
+        self.root.bind('<Control-e>', lambda e: self._toggle_edit_mode())
+        self.root.bind('<Control-E>', lambda e: self._toggle_edit_mode())
         
         # Clipboard operations
         self.root.bind('<Control-x>', lambda e: self._cut_node())
@@ -1965,6 +2100,14 @@ Created with FlexTree library."""
         self.root.bind('<Control-V>', lambda e: self._paste_node())
         self.root.bind('<Control-i>', lambda e: self._insert_new_node())
         self.root.bind('<Control-I>', lambda e: self._insert_new_node())
+        
+        # Search and replace operations
+        self.root.bind('<Control-f>', lambda e: self._open_search_dialog())
+        self.root.bind('<Control-F>', lambda e: self._open_search_dialog())
+        self.root.bind('<Control-h>', lambda e: self._open_replace_dialog())
+        self.root.bind('<Control-H>', lambda e: self._open_replace_dialog())
+        self.root.bind('<Escape>', lambda e: self._close_search_dialogs())
+        
         self.root.bind('<Delete>', lambda e: self._delete_node())
     
     def _get_selected_node(self) -> Optional[TreeNode]:
@@ -2311,19 +2454,7 @@ Created with FlexTree library."""
     
     def _deep_copy_tree(self, tree: Tree) -> Tree:
         """Create a deep copy of the entire tree."""
-        def copy_node_recursive(node: TreeNode) -> TreeNode:
-            # Create new node with copied content
-            new_node = TreeNode(node.name, copy.deepcopy(node.content))
-            
-            # Recursively copy all children
-            for child in node.children:
-                new_node.add_child(copy_node_recursive(child))
-            
-            return new_node
-        
-        # Create new tree with copied root
-        new_root = copy_node_recursive(tree.root)
-        return Tree(new_root)
+        return tree.deepcopy()
     
     def _record_action_state(self, action_type: str, action_data: Optional[Dict[str, Any]] = None):
         """Record the current state before performing an action."""
@@ -2370,11 +2501,14 @@ Created with FlexTree library."""
         
         # Update status bar
         self._update_action_status()
+        
+        # Mark as changed since an action was completed
+        self._mark_as_changed()
     
     def _undo_action(self):
         """Undo the last action."""
         if not self.action_memory.can_undo():
-            messagebox.showinfo("Undo", "No actions to undo.")
+            # messagebox.showinfo("Undo", "No actions to undo.")
             return
         
         try:
@@ -2402,6 +2536,9 @@ Created with FlexTree library."""
             # Update status
             self._update_action_status()
             
+            # Mark as changed (even undoing counts as a change from the saved state)
+            self._mark_as_changed()
+            
             # Clear clipboard if it contained nodes that no longer exist
             self._validate_clipboard()
             
@@ -2411,7 +2548,7 @@ Created with FlexTree library."""
     def _redo_action(self):
         """Redo the next action."""
         if not self.action_memory.can_redo():
-            messagebox.showinfo("Redo", "No actions to redo.")
+            # messagebox.showinfo("Redo", "No actions to redo.")
             return
         
         try:
@@ -2425,6 +2562,9 @@ Created with FlexTree library."""
             
             # Update status
             self._update_action_status()
+            
+            # Mark as changed (redoing counts as a change from the saved state)
+            self._mark_as_changed()
             
         except Exception as e:
             messagebox.showerror("Redo Error", f"Failed to redo action:\n{str(e)}")
@@ -2495,10 +2635,6 @@ Created with FlexTree library."""
             messagebox.showwarning("No Selection", "Please select a node to rename.")
             return
         
-        if selected_node == self.tree.root:
-            messagebox.showwarning("Cannot Rename Root", "Cannot rename the root node.")
-            return
-        
         # Use the existing EditNodeNameDialog
         dialog = EditNodeNameDialog(self.root, selected_node.name)
         
@@ -2547,6 +2683,467 @@ Created with FlexTree library."""
         else:
             messagebox.showwarning("No Selection", "Please select a node to edit its content.")
     
+    def _open_search_dialog(self):
+        """Open the search dialog."""
+        if self.search_dialog and hasattr(self.search_dialog, 'dialog') and self.search_dialog.dialog.winfo_exists():
+            # If dialog exists, bring it to front
+            self.search_dialog.dialog.lift()
+            self.search_dialog.dialog.focus()
+            return
+            
+        self.search_dialog = SearchDialog(
+            self.root, 
+            self._perform_search,
+            navigate_callback=self._navigate_to_search_result,
+            find_next_callback=self._find_next
+        )
+        
+    def _open_replace_dialog(self):
+        """Open the find and replace dialog."""
+        if self.replace_dialog and hasattr(self.replace_dialog, 'dialog') and self.replace_dialog.dialog.winfo_exists():
+            # If dialog exists, bring it to front
+            self.replace_dialog.dialog.lift()
+            self.replace_dialog.dialog.focus()
+            return
+            
+        self.replace_dialog = ReplaceDialog(
+            self.root, 
+            self._perform_search, 
+            self._perform_replace,
+            navigate_callback=self._navigate_to_search_result,
+            find_next_callback=self._find_next
+        )
+    
+    def _close_search_dialogs(self):
+        """Close any open search dialogs."""
+        if self.search_dialog and hasattr(self.search_dialog, 'dialog') and self.search_dialog.dialog.winfo_exists():
+            self.search_dialog.dialog.destroy()
+        if self.replace_dialog and hasattr(self.replace_dialog, 'dialog') and self.replace_dialog.dialog.winfo_exists():
+            self.replace_dialog.dialog.destroy()
+    
+    def _perform_search(self, search_term, options):
+        """Perform search across the tree and return results."""
+        results = []
+        
+        if not self.tree or not self.tree.root:
+            return results
+        
+        # Prepare search term based on case sensitivity
+        if options['case_sensitive']:
+            search_func = lambda text: search_term in text
+            exact_search = search_term
+        else:
+            search_func = lambda text: search_term.lower() in text.lower()
+            exact_search = search_term.lower()
+        
+        # Recursive search function
+        def search_node(node):
+            node_results = []
+            
+            # Search in node name
+            if options['search_names']:
+                node_name = node.name if options['case_sensitive'] else node.name.lower()
+                
+                if options['whole_words']:
+                    # Use word boundary matching
+                    import re
+                    pattern = r'\b' + re.escape(exact_search) + r'\b'
+                    flags = 0 if options['case_sensitive'] else re.IGNORECASE
+                    if re.search(pattern, node.name, flags):
+                        node_results.append({
+                            'node': node,
+                            'type': 'name',
+                            'match_text': search_term,
+                            'full_text': node.name
+                        })
+                else:
+                    if search_func(node.name):
+                        node_results.append({
+                            'node': node,
+                            'type': 'name',
+                            'match_text': search_term,
+                            'full_text': node.name
+                        })
+            
+            # Search in node content
+            if options['search_content'] and node.content is not None:
+                content_str = str(node.content)
+                content_search = content_str if options['case_sensitive'] else content_str.lower()
+                
+                if options['whole_words']:
+                    # Use word boundary matching for content
+                    import re
+                    pattern = r'\b' + re.escape(exact_search) + r'\b'
+                    flags = 0 if options['case_sensitive'] else re.IGNORECASE
+                    if re.search(pattern, content_str, flags):
+                        node_results.append({
+                            'node': node,
+                            'type': 'content',
+                            'match_text': search_term,
+                            'full_text': content_str
+                        })
+                else:
+                    if search_func(content_str):
+                        node_results.append({
+                            'node': node,
+                            'type': 'content',
+                            'match_text': search_term,
+                            'full_text': content_str
+                        })
+            
+            # Search in children
+            for child in node.children:
+                node_results.extend(search_node(child))
+                
+            return node_results
+        
+        # Perform search starting from root
+        self.search_results = search_node(self.tree.root)
+        self.current_search_index = -1
+        
+        return self.search_results
+    
+    def _perform_replace(self, result, find_text, replace_text, options):
+        """Perform replace operation on a search result."""
+        try:
+            node = result['node']
+            result_type = result['type']
+            
+            # Record action for undo
+            self._record_action_state("replace", {
+                'node_name': node.name,
+                'type': result_type,
+                'find_text': find_text,
+                'replace_text': replace_text
+            })
+            
+            if result_type == 'name':
+                # Replace in node name
+                old_name = node.name
+                if options['whole_words']:
+                    import re
+                    pattern = r'\b' + re.escape(find_text) + r'\b'
+                    flags = 0 if options['case_sensitive'] else re.IGNORECASE
+                    new_name = re.sub(pattern, replace_text, old_name, flags=flags)
+                else:
+                    if options['case_sensitive']:
+                        new_name = old_name.replace(find_text, replace_text)
+                    else:
+                        # Case insensitive replacement
+                        import re
+                        pattern = re.escape(find_text)
+                        flags = re.IGNORECASE
+                        new_name = re.sub(pattern, replace_text, old_name, flags=flags)
+                
+                if new_name != old_name:
+                    # Validate name uniqueness
+                    if not self._is_name_unique_for_rename(node, new_name):
+                        messagebox.showerror("Replace Error", f"Name '{new_name}' already exists in the tree.")
+                        return False
+                    
+                    node.name = new_name
+                    # Refresh tree display
+                    self.treeviewer.load_tree(self.tree, preserve_expansion=True)
+                    # Update info panel if this node is selected
+                    selected_node = self._get_selected_node()
+                    if selected_node and selected_node.name == new_name:
+                        self.infoviewer.display_node_info(selected_node)
+            
+            elif result_type == 'content':
+                # Replace in node content
+                if node.content is not None:
+                    # Determine if original content is JSON-structured (dict/list/tuple)
+                    is_json_struct = False
+                    json_text = None
+                    parsed_json = None
+
+                    if isinstance(node.content, (dict, list, tuple)):
+                        is_json_struct = True
+                        json_text = json.dumps(node.content, ensure_ascii=False)
+                    elif isinstance(node.content, str):
+                        # If it's a string, check whether it contains valid JSON
+                        try:
+                            parsed_json = json.loads(node.content)
+                            is_json_struct = True
+                            json_text = json.dumps(parsed_json, ensure_ascii=False)
+                        except Exception:
+                            # not JSON, treat as plain string below
+                            is_json_struct = False
+                            json_text = None
+
+                    # Perform replacement either on JSON text (if structured) or on plain text
+                    if is_json_struct and json_text is not None:
+                        old_content = json_text
+                        try:
+                            if options['whole_words']:
+                                import re
+                                pattern = r'\b' + re.escape(find_text) + r'\b'
+                                flags = 0 if options['case_sensitive'] else re.IGNORECASE
+                                new_content_str = re.sub(pattern, replace_text, old_content, flags=flags)
+                            else:
+                                if options['case_sensitive']:
+                                    new_content_str = old_content.replace(find_text, replace_text)
+                                else:
+                                    import re
+                                    pattern = re.escape(find_text)
+                                    flags = re.IGNORECASE
+                                    new_content_str = re.sub(pattern, replace_text, old_content, flags=flags)
+
+                            if new_content_str != old_content:
+                                # Try to parse back to JSON to preserve structure
+                                try:
+                                    new_parsed = json.loads(new_content_str)
+                                    node.content = new_parsed
+                                except Exception:
+                                    # Replacement would break JSON structure -> abort replace
+                                    messagebox.showerror(
+                                        "Replace Error",
+                                        "Replacement would produce invalid JSON. Operation aborted to preserve JSON format."
+                                    )
+                                    return False
+                        except Exception as e:
+                            messagebox.showerror("Replace Error", f"Failed to perform replacement on JSON content:\n{e}")
+                            return False
+
+                    else:
+                        # Non-JSON content: fall back to previous behavior operating on string representation
+                        old_content = str(node.content)
+                        if options['whole_words']:
+                            import re
+                            pattern = r'\b' + re.escape(find_text) + r'\b'
+                            flags = 0 if options['case_sensitive'] else re.IGNORECASE
+                            new_content_str = re.sub(pattern, replace_text, old_content, flags=flags)
+                        else:
+                            if options['case_sensitive']:
+                                new_content_str = old_content.replace(find_text, replace_text)
+                            else:
+                                import re
+                                pattern = re.escape(find_text)
+                                flags = re.IGNORECASE
+                                new_content_str = re.sub(pattern, replace_text, old_content, flags=flags)
+
+                        if new_content_str != old_content:
+                            # Try to preserve numeric types where sensible
+                            try:
+                                if isinstance(node.content, str):
+                                    node.content = new_content_str
+                                elif isinstance(node.content, (int, float)):
+                                    if '.' in new_content_str:
+                                        node.content = float(new_content_str)
+                                    else:
+                                        node.content = int(new_content_str)
+                                else:
+                                    node.content = new_content_str
+                            except ValueError:
+                                node.content = new_content_str
+
+                    # Update info panel if this node is selected
+                    selected_node = self._get_selected_node()
+                    if selected_node == node:
+                        self.infoviewer.display_node_info(selected_node)
+            
+            self._complete_action_state()
+            return True
+            
+        except Exception as e:
+            messagebox.showerror("Replace Error", f"Error performing replace: {str(e)}")
+            return False
+    
+    def _is_name_unique_for_rename(self, node, new_name):
+        """Check if a new name is unique when renaming a node (excluding the node itself)."""
+        if not self.tree or not self.tree.root:
+            return True
+            
+        def check_subtree(current_node):
+            if current_node != node and current_node.name == new_name:
+                return False
+            for child in current_node.children:
+                if not check_subtree(child):
+                    return False
+            return True
+            
+        return check_subtree(self.tree.root)
+    
+    def _navigate_to_search_result(self, result):
+        """Navigate to and highlight a search result."""
+        node = result['node']
+        result_type = result['type']
+        
+        # Select the node in tree viewer
+        self._select_node_in_tree(node)
+        
+        # Navigate to appropriate tab and highlight
+        if result_type == 'content':
+            # Switch to content tab
+            self.infoviewer.notebook.select(1)  # Content tab is index 1
+            
+            # Delay highlighting to ensure widget is ready after tab switch
+            self.root.after(10, self._delayed_highlight_content, result['match_text'])
+        else:
+            # For name matches, switch to overview tab
+            self.infoviewer.notebook.select(0)  # Overview tab is index 0
+    
+    def _delayed_highlight_content(self, search_term):
+        """Highlight content with a delay to ensure widget is ready."""
+        try:
+            # Check if content is displayed as text
+            if (hasattr(self.infoviewer, 'content_text') and 
+                self.infoviewer.content_text and 
+                self.infoviewer.content_display_mode == "text"):
+                self._highlight_text_in_widget(self.infoviewer.content_text, search_term)
+            
+            # Check if content is displayed as table
+            elif (hasattr(self.infoviewer, 'content_table') and 
+                  self.infoviewer.content_table and 
+                  self.infoviewer.content_display_mode == "table"):
+                self._highlight_text_in_widget(self.infoviewer.content_table, search_term)
+        
+        except Exception as e:
+            print(f"Error in delayed highlight: {e}")
+    
+    def _highlight_text_in_widget(self, widget, search_term):
+        """Highlight search term in a text widget or auto-select row in a table widget."""
+        try:
+            # Do nothing if no search term
+            if not search_term:
+                return
+
+            # Guard: widget may have been destroyed; ensure it exists
+            if not getattr(widget, "winfo_exists", lambda: False)():
+                return
+
+            # Check if widget is a Treeview (table) or Text widget
+            if hasattr(widget, 'get_children'):  # This is a Treeview widget
+                self._handle_table_search(widget, search_term)
+            elif hasattr(widget, 'search'):  # This is a Text widget
+                self._handle_text_search(widget, search_term)
+
+        except Exception as e:
+            # Avoid crashing due to widget being destroyed; log for debugging
+            print(f"Error highlighting/selecting in widget: {e}")
+    
+    def _handle_text_search(self, text_widget, search_term):
+        """Handle search highlighting in text widgets."""
+        try:
+            # Guard: ensure widget still exists and supports search
+            if not text_widget.winfo_exists() or not hasattr(text_widget, "search"):
+                return
+
+            # Clear any existing highlights (only if widget still exists)
+            if text_widget.winfo_exists():
+                text_widget.tag_remove('search_highlight', '1.0', tk.END)
+                # Configure highlight tag
+                text_widget.tag_config('search_highlight', background='yellow', foreground='black')
+            else:
+                return
+
+            # Search for all occurrences, checking existence between operations
+            start_pos = '1.0'
+            while True:
+                if not text_widget.winfo_exists():
+                    break
+
+                pos = text_widget.search(search_term, start_pos, tk.END)
+                if not pos:
+                    break
+
+                # Calculate end position
+                end_pos = f"{pos}+{len(search_term)}c"
+
+                if not text_widget.winfo_exists():
+                    break
+
+                # Add highlight tag
+                text_widget.tag_add('search_highlight', pos, end_pos)
+
+                # Move to next position
+                start_pos = end_pos
+
+            # Scroll to first occurrence if found and widget still exists
+            if text_widget.winfo_exists():
+                first_pos = text_widget.search(search_term, '1.0', tk.END)
+                if first_pos:
+                    text_widget.see(first_pos)
+
+        except Exception as e:
+            print(f"Error highlighting text: {e}")
+    
+    def _handle_table_search(self, table_widget, search_term):
+        """Handle search and auto-selection in table widgets (Treeview)."""
+        try:
+            # Guard: ensure widget still exists
+            if not table_widget.winfo_exists():
+                return
+
+            # Clear any existing selection
+            table_widget.selection_remove(*table_widget.selection())
+
+            # Search through all table items
+            found_item = None
+            search_term_lower = search_term.lower()
+            
+            for item_id in table_widget.get_children():
+                if not table_widget.winfo_exists():
+                    break
+                
+                # Check item text (first column)
+                item_text = table_widget.item(item_id, 'text')
+                if search_term_lower in str(item_text).lower():
+                    found_item = item_id
+                    break
+                
+                # Check item values (other columns)
+                item_values = table_widget.item(item_id, 'values')
+                if item_values:
+                    for value in item_values:
+                        if search_term_lower in str(value).lower():
+                            found_item = item_id
+                            break
+                    
+                    if found_item:
+                        break
+
+            # Select and scroll to the found item
+            if found_item and table_widget.winfo_exists():
+                table_widget.selection_set(found_item)
+                table_widget.focus(found_item)
+                table_widget.see(found_item)
+
+        except Exception as e:
+            print(f"Error selecting table row: {e}")
+    
+    def _find_next(self):
+        """Find next search result."""
+        if not self.search_results:
+            return
+            
+        self.current_search_index = (self.current_search_index + 1) % len(self.search_results)
+        result = self.search_results[self.current_search_index]
+        self._navigate_to_search_result(result)
+        
+        # Update search dialog if open
+        if self.search_dialog and hasattr(self.search_dialog, 'dialog') and self.search_dialog.dialog.winfo_exists():
+            self.search_dialog.current_index = self.current_search_index
+            self.search_dialog.results_listbox.selection_clear(0, tk.END)
+            self.search_dialog.results_listbox.selection_set(self.current_search_index)
+            self.search_dialog.results_listbox.see(self.current_search_index)
+    
+    def _find_previous(self):
+        """Find previous search result."""
+        if not self.search_results:
+            return
+            
+        self.current_search_index = (self.current_search_index - 1) % len(self.search_results)
+        result = self.search_results[self.current_search_index]
+        self._navigate_to_search_result(result)
+        
+        # Update search dialog if open
+        if self.search_dialog and hasattr(self.search_dialog, 'dialog') and self.search_dialog.dialog.winfo_exists():
+            self.search_dialog.current_index = self.current_search_index
+            self.search_dialog.results_listbox.selection_clear(0, tk.END)
+            self.search_dialog.results_listbox.selection_set(self.current_search_index)
+            self.search_dialog.results_listbox.see(self.current_search_index)
+
     def run(self):
         """Start the UI application main loop."""
         self.root.mainloop()
@@ -2944,6 +3541,502 @@ class AddSimpleItemDialog:
     
     def _cancel_clicked(self):
         self.result = None
+        self.dialog.destroy()
+
+
+class SearchDialog:
+    """Dialog for searching nodes and content with various options."""
+    
+    def __init__(self, parent, search_callback, navigate_callback=None, find_next_callback=None):
+        self.parent = parent
+        self.search_callback = search_callback
+        self.navigate_callback = navigate_callback
+        self.find_next_callback = find_next_callback
+        self.result = None
+        
+        # Create dialog window
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Find")
+        self.dialog.geometry("400x300")
+        self.dialog.resizable(True, True)
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        
+        # Center the dialog
+        self.dialog.update_idletasks()
+        x = (self.dialog.winfo_screenwidth() // 2) - (400 // 2)
+        y = (self.dialog.winfo_screenheight() // 2) - (300 // 2)
+        self.dialog.geometry(f"400x300+{x}+{y}")
+        
+        self._setup_ui()
+        
+        # Focus and bind keys
+        self.search_entry.focus()
+        self.dialog.bind('<Return>', lambda e: self._search())
+        self.dialog.bind('<Escape>', lambda e: self._close())
+        
+    def _setup_ui(self):
+        """Setup the search dialog UI."""
+        main_frame = ttk.Frame(self.dialog)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Search term
+        ttk.Label(main_frame, text="Find what:").grid(row=0, column=0, sticky='w', pady=(0, 5))
+        self.search_entry = ttk.Entry(main_frame, width=40)
+        self.search_entry.grid(row=0, column=1, columnspan=2, sticky='ew', pady=(0, 5))
+        
+        # Search options frame
+        options_frame = ttk.LabelFrame(main_frame, text="Search Options")
+        options_frame.grid(row=1, column=0, columnspan=3, sticky='ew', pady=10)
+        options_frame.grid_columnconfigure(0, weight=1)
+        options_frame.grid_columnconfigure(1, weight=1)
+        
+        # Search scope
+        self.search_names = tk.BooleanVar(value=True)
+        self.search_content = tk.BooleanVar(value=False)
+        ttk.Checkbutton(options_frame, text="Search node names", variable=self.search_names).grid(row=0, column=0, sticky='w', padx=5, pady=2)
+        ttk.Checkbutton(options_frame, text="Search content", variable=self.search_content).grid(row=0, column=1, sticky='w', padx=5, pady=2)
+        
+        # Match options
+        self.case_sensitive = tk.BooleanVar(value=False)
+        self.whole_words = tk.BooleanVar(value=False)
+        ttk.Checkbutton(options_frame, text="Case sensitive", variable=self.case_sensitive).grid(row=1, column=0, sticky='w', padx=5, pady=2)
+        ttk.Checkbutton(options_frame, text="Match whole words", variable=self.whole_words).grid(row=1, column=1, sticky='w', padx=5, pady=2)
+        
+        # Results display
+        results_frame = ttk.LabelFrame(main_frame, text="Search Results")
+        results_frame.grid(row=2, column=0, columnspan=3, sticky='nsew', pady=10)
+        results_frame.grid_columnconfigure(0, weight=1)
+        results_frame.grid_rowconfigure(1, weight=1)
+        
+        # Results info
+        self.results_label = ttk.Label(results_frame, text="No search performed yet")
+        self.results_label.grid(row=0, column=0, sticky='w', padx=5, pady=2)
+        
+        # Results listbox
+        listbox_frame = ttk.Frame(results_frame)
+        listbox_frame.grid(row=1, column=0, sticky='nsew', padx=5, pady=5)
+        listbox_frame.grid_columnconfigure(0, weight=1)
+        listbox_frame.grid_rowconfigure(0, weight=1)
+        
+        self.results_listbox = tk.Listbox(listbox_frame)
+        results_scrollbar = ttk.Scrollbar(listbox_frame, orient=tk.VERTICAL, command=self.results_listbox.yview)
+        self.results_listbox.configure(yscrollcommand=results_scrollbar.set)
+        
+        self.results_listbox.grid(row=0, column=0, sticky='nsew')
+        results_scrollbar.grid(row=0, column=1, sticky='ns')
+        
+        # Bind listbox selection
+        self.results_listbox.bind('<<ListboxSelect>>', self._on_result_select)
+        self.results_listbox.bind('<Double-Button-1>', self._on_result_double_click)
+        
+        # Buttons frame
+        buttons_frame = ttk.Frame(main_frame)
+        buttons_frame.grid(row=3, column=0, columnspan=3, sticky='ew', pady=10)
+        buttons_frame.grid_columnconfigure(0, weight=1)
+        buttons_frame.grid_columnconfigure(1, weight=1)
+        buttons_frame.grid_columnconfigure(2, weight=1)
+        buttons_frame.grid_columnconfigure(3, weight=1)
+        
+        ttk.Button(buttons_frame, text="Find All", command=self._search).grid(row=0, column=0, padx=2, sticky='ew')
+        ttk.Button(buttons_frame, text="Find Next", command=self._find_next).grid(row=0, column=1, padx=2, sticky='ew')
+        ttk.Button(buttons_frame, text="Find Previous", command=self._find_previous).grid(row=0, column=2, padx=2, sticky='ew')
+        ttk.Button(buttons_frame, text="Close", command=self._close).grid(row=0, column=3, padx=2, sticky='ew')
+        # Bind F3 / Shift+F3 for quick navigation
+        self.dialog.bind('<F3>', lambda e: self._find_next())
+        self.dialog.bind('<Shift-F3>', lambda e: self._find_previous())
+
+        # Configure grid weights
+        main_frame.grid_columnconfigure(1, weight=1)
+        main_frame.grid_rowconfigure(2, weight=1)
+        
+        # Store search results
+        self.search_results = []
+        self.current_index = -1
+        
+    def _search(self):
+        """Perform search and display results."""
+        search_term = self.search_entry.get().strip()
+        if not search_term:
+            self.results_label.config(text="Please enter a search term")
+            return
+            
+        options = {
+            'search_names': self.search_names.get(),
+            'search_content': self.search_content.get(),
+            'case_sensitive': self.case_sensitive.get(),
+            'whole_words': self.whole_words.get()
+        }
+        
+        if not options['search_names'] and not options['search_content']:
+            self.results_label.config(text="Please select at least one search scope (names or content)")
+            return
+            
+        # Call the search callback
+        self.search_results = self.search_callback(search_term, options)
+        self.current_index = -1
+        
+        # Display results
+        self.results_listbox.delete(0, tk.END)
+        
+        if not self.search_results:
+            self.results_label.config(text="No matches found")
+        else:
+            self.results_label.config(text=f"Found {len(self.search_results)} matches")
+            for i, result in enumerate(self.search_results):
+                node_path = self._get_node_path(result['node'])
+                if result['type'] == 'name':
+                    display_text = f"[Name] {node_path}"
+                else:
+                    display_text = f"[Content] {node_path}"
+                self.results_listbox.insert(tk.END, display_text)
+    
+    def _get_node_path(self, node):
+        """Get the full path to a node."""
+        path = []
+        current = node
+        while current:
+            path.append(current.name)
+            current = current.parent
+        return " > ".join(reversed(path))
+    
+    def _on_result_select(self, event):
+        """Handle result selection."""
+        selection = self.results_listbox.curselection()
+        if selection:
+            self.current_index = selection[0]
+    
+    def _on_result_double_click(self, event):
+        """Handle double-click on result to navigate."""
+        selection = self.results_listbox.curselection()
+        if selection:
+            self.current_index = selection[0]
+            self._navigate_to_current()
+    
+    def _find_next(self):
+        """Navigate to next search result."""
+        if not self.search_results:
+            return
+            
+        self.current_index = (self.current_index + 1) % len(self.search_results)
+        self.results_listbox.selection_clear(0, tk.END)
+        self.results_listbox.selection_set(self.current_index)
+        self.results_listbox.see(self.current_index)
+        self._navigate_to_current()
+        
+        # Also trigger the main UI's find next method if available
+        if self.find_next_callback:
+            self.find_next_callback()
+    
+    def _find_previous(self):
+        """Navigate to previous search result."""
+        if not self.search_results:
+            return
+            
+        self.current_index = (self.current_index - 1) % len(self.search_results)
+        self.results_listbox.selection_clear(0, tk.END)
+        self.results_listbox.selection_set(self.current_index)
+        self.results_listbox.see(self.current_index)
+        self._navigate_to_current()
+    
+    def _navigate_to_current(self):
+        """Navigate to the current search result."""
+        if 0 <= self.current_index < len(self.search_results):
+            result = self.search_results[self.current_index]
+            # Use the navigate callback if provided, otherwise fall back to parent method
+            if self.navigate_callback:
+                self.navigate_callback(result)
+            elif hasattr(self.parent, '_navigate_to_search_result'):
+                self.parent._navigate_to_search_result(result)
+    
+    def _close(self):
+        """Close the search dialog."""
+        self.dialog.destroy()
+
+
+class ReplaceDialog:
+    """Dialog for find and replace functionality."""
+    
+    def __init__(self, parent, search_callback, replace_callback, navigate_callback=None, find_next_callback=None):
+        self.parent = parent
+        self.search_callback = search_callback
+        self.replace_callback = replace_callback
+        self.navigate_callback = navigate_callback
+        self.find_next_callback = find_next_callback
+        self.result = None
+        
+        # Create dialog window
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("Find and Replace")
+        self.dialog.geometry("450x400")
+        self.dialog.resizable(True, True)
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        
+        # Center the dialog
+        self.dialog.update_idletasks()
+        x = (self.dialog.winfo_screenwidth() // 2) - (450 // 2)
+        y = (self.dialog.winfo_screenheight() // 2) - (400 // 2)
+        self.dialog.geometry(f"450x400+{x}+{y}")
+        
+        self._setup_ui()
+        
+        # Focus and bind keys
+        self.find_entry.focus()
+        self.dialog.bind('<Return>', lambda e: self._search())
+        self.dialog.bind('<Escape>', lambda e: self._close())
+        
+    def _setup_ui(self):
+        """Setup the replace dialog UI."""
+        main_frame = ttk.Frame(self.dialog)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Find and replace entries
+        ttk.Label(main_frame, text="Find what:").grid(row=0, column=0, sticky='w', pady=(0, 5))
+        self.find_entry = ttk.Entry(main_frame, width=40)
+        self.find_entry.grid(row=0, column=1, columnspan=2, sticky='ew', pady=(0, 5))
+        
+        ttk.Label(main_frame, text="Replace with:").grid(row=1, column=0, sticky='w', pady=(0, 10))
+        self.replace_entry = ttk.Entry(main_frame, width=40)
+        self.replace_entry.grid(row=1, column=1, columnspan=2, sticky='ew', pady=(0, 10))
+        
+        # Search options frame (same as search dialog)
+        options_frame = ttk.LabelFrame(main_frame, text="Search Options")
+        options_frame.grid(row=2, column=0, columnspan=3, sticky='ew', pady=10)
+        options_frame.grid_columnconfigure(0, weight=1)
+        options_frame.grid_columnconfigure(1, weight=1)
+        
+        # Search scope
+        self.search_names = tk.BooleanVar(value=True)
+        self.search_content = tk.BooleanVar(value=False)
+        ttk.Checkbutton(options_frame, text="Search node names", variable=self.search_names).grid(row=0, column=0, sticky='w', padx=5, pady=2)
+        ttk.Checkbutton(options_frame, text="Search content", variable=self.search_content).grid(row=0, column=1, sticky='w', padx=5, pady=2)
+        
+        # Match options
+        self.case_sensitive = tk.BooleanVar(value=False)
+        self.whole_words = tk.BooleanVar(value=False)
+        ttk.Checkbutton(options_frame, text="Case sensitive", variable=self.case_sensitive).grid(row=1, column=0, sticky='w', padx=5, pady=2)
+        ttk.Checkbutton(options_frame, text="Match whole words", variable=self.whole_words).grid(row=1, column=1, sticky='w', padx=5, pady=2)
+        
+        # Results display (same as search dialog but with replace buttons)
+        results_frame = ttk.LabelFrame(main_frame, text="Search Results")
+        results_frame.grid(row=3, column=0, columnspan=3, sticky='nsew', pady=10)
+        results_frame.grid_columnconfigure(0, weight=1)
+        results_frame.grid_rowconfigure(1, weight=1)
+        
+        # Results info
+        self.results_label = ttk.Label(results_frame, text="No search performed yet")
+        self.results_label.grid(row=0, column=0, sticky='w', padx=5, pady=2)
+        
+        # Results listbox
+        listbox_frame = ttk.Frame(results_frame)
+        listbox_frame.grid(row=1, column=0, sticky='nsew', padx=5, pady=5)
+        listbox_frame.grid_columnconfigure(0, weight=1)
+        listbox_frame.grid_rowconfigure(0, weight=1)
+        
+        self.results_listbox = tk.Listbox(listbox_frame)
+        results_scrollbar = ttk.Scrollbar(listbox_frame, orient=tk.VERTICAL, command=self.results_listbox.yview)
+        self.results_listbox.configure(yscrollcommand=results_scrollbar.set)
+        
+        self.results_listbox.grid(row=0, column=0, sticky='nsew')
+        results_scrollbar.grid(row=0, column=1, sticky='ns')
+        
+        # Bind listbox selection
+        self.results_listbox.bind('<<ListboxSelect>>', self._on_result_select)
+        self.results_listbox.bind('<Double-Button-1>', self._on_result_double_click)
+        # Buttons frame
+        buttons_frame = ttk.Frame(main_frame)
+        buttons_frame.grid(row=4, column=0, columnspan=3, sticky='ew', pady=10)
+        
+        # First row of buttons
+        buttons_frame1 = ttk.Frame(buttons_frame)
+        buttons_frame1.pack(fill=tk.X, pady=(0, 5))
+        buttons_frame1.grid_columnconfigure(0, weight=1)
+        buttons_frame1.grid_columnconfigure(1, weight=1)
+        buttons_frame1.grid_columnconfigure(2, weight=1)
+        
+        ttk.Button(buttons_frame1, text="Find All", command=self._search).grid(row=0, column=0, padx=2, sticky='ew')
+        ttk.Button(buttons_frame1, text="Find Next", command=self._find_next).grid(row=0, column=1, padx=2, sticky='ew')
+        ttk.Button(buttons_frame1, text="Find Previous", command=self._find_previous).grid(row=0, column=2, padx=2, sticky='ew')
+
+        # Bind F3 / Shift+F3 for quick navigation
+        self.dialog.bind('<F3>', lambda e: self._find_next())
+        self.dialog.bind('<Shift-F3>', lambda e: self._find_previous())
+
+
+        # Second row of buttons
+        buttons_frame2 = ttk.Frame(buttons_frame)
+        buttons_frame2.pack(fill=tk.X, pady=(0, 5))
+        buttons_frame2.grid_columnconfigure(0, weight=1)
+        buttons_frame2.grid_columnconfigure(1, weight=1)
+        buttons_frame2.grid_columnconfigure(2, weight=1)
+        
+        ttk.Button(buttons_frame2, text="Replace", command=self._replace_current).grid(row=0, column=0, padx=2, sticky='ew')
+        ttk.Button(buttons_frame2, text="Replace All", command=self._replace_all).grid(row=0, column=1, padx=2, sticky='ew')
+        ttk.Button(buttons_frame2, text="Close", command=self._close).grid(row=0, column=2, padx=2, sticky='ew')
+        
+        # Configure grid weights
+        main_frame.grid_columnconfigure(1, weight=1)
+        main_frame.grid_rowconfigure(3, weight=1)
+        
+        # Store search results
+        self.search_results = []
+        self.current_index = -1
+        
+    def _search(self):
+        """Perform search and display results."""
+        search_term = self.find_entry.get().strip()
+        if not search_term:
+            self.results_label.config(text="Please enter a search term")
+            return
+            
+        options = {
+            'search_names': self.search_names.get(),
+            'search_content': self.search_content.get(),
+            'case_sensitive': self.case_sensitive.get(),
+            'whole_words': self.whole_words.get()
+        }
+        
+        if not options['search_names'] and not options['search_content']:
+            self.results_label.config(text="Please select at least one search scope (names or content)")
+            return
+            
+        # Call the search callback
+        self.search_results = self.search_callback(search_term, options)
+        self.current_index = -1
+        
+        # Display results
+        self.results_listbox.delete(0, tk.END)
+        
+        if not self.search_results:
+            self.results_label.config(text="No matches found")
+        else:
+            self.results_label.config(text=f"Found {len(self.search_results)} matches")
+            for i, result in enumerate(self.search_results):
+                node_path = self._get_node_path(result['node'])
+                if result['type'] == 'name':
+                    display_text = f"[Name] {node_path}"
+                else:
+                    display_text = f"[Content] {node_path}"
+                self.results_listbox.insert(tk.END, display_text)
+    
+    def _get_node_path(self, node):
+        """Get the full path to a node."""
+        path = []
+        current = node
+        while current:
+            path.append(current.name)
+            current = current.parent
+        return " > ".join(reversed(path))
+    
+    def _on_result_select(self, event):
+        """Handle result selection."""
+        selection = self.results_listbox.curselection()
+        if selection:
+            self.current_index = selection[0]
+    
+    def _on_result_double_click(self, event):
+        """Handle double-click on result to navigate."""
+        selection = self.results_listbox.curselection()
+        if selection:
+            self.current_index = selection[0]
+            self._navigate_to_current()
+    
+    def _find_next(self):
+        """Navigate to next search result."""
+        if not self.search_results:
+            return
+            
+        self.current_index = (self.current_index + 1) % len(self.search_results)
+        self.results_listbox.selection_clear(0, tk.END)
+        self.results_listbox.selection_set(self.current_index)
+        self.results_listbox.see(self.current_index)
+        self._navigate_to_current()
+    
+    def _find_previous(self):
+        """Navigate to previous search result."""
+        if not self.search_results:
+            return
+            
+        self.current_index = (self.current_index - 1) % len(self.search_results)
+        self.results_listbox.selection_clear(0, tk.END)
+        self.results_listbox.selection_set(self.current_index)
+        self.results_listbox.see(self.current_index)
+        self._navigate_to_current()
+        
+        # Also trigger the main UI's find next method if available
+        if self.find_next_callback:
+            self.find_next_callback()
+    
+    def _navigate_to_current(self):
+        """Navigate to the current search result."""
+        if 0 <= self.current_index < len(self.search_results):
+            result = self.search_results[self.current_index]
+            # Use the navigate callback if provided, otherwise fall back to parent method
+            if self.navigate_callback:
+                self.navigate_callback(result)
+            elif hasattr(self.parent, '_navigate_to_search_result'):
+                self.parent._navigate_to_search_result(result)
+    
+    def _replace_current(self):
+        """Replace the current selected result."""
+        if 0 <= self.current_index < len(self.search_results):
+            find_text = self.find_entry.get()
+            replace_text = self.replace_entry.get()
+            result = self.search_results[self.current_index]
+            
+            options = {
+                'case_sensitive': self.case_sensitive.get(),
+                'whole_words': self.whole_words.get()
+            }
+            
+            success = self.replace_callback(result, find_text, replace_text, options)
+            if success:
+                # Remove this result from the list and refresh display
+                self.search_results.pop(self.current_index)
+                self.results_listbox.delete(self.current_index)
+                
+                # Adjust current index
+                if self.current_index >= len(self.search_results):
+                    self.current_index = len(self.search_results) - 1
+                
+                # Update results count
+                if self.search_results:
+                    self.results_label.config(text=f"Found {len(self.search_results)} matches")
+                    if self.current_index >= 0:
+                        self.results_listbox.selection_set(self.current_index)
+                else:
+                    self.results_label.config(text="No matches remaining")
+    
+    def _replace_all(self):
+        """Replace all search results."""
+        if not self.search_results:
+            return
+            
+        find_text = self.find_entry.get()
+        replace_text = self.replace_entry.get()
+        
+        options = {
+            'case_sensitive': self.case_sensitive.get(),
+            'whole_words': self.whole_words.get()
+        }
+        
+        replaced_count = 0
+        # Work backwards to avoid index issues
+        for i in range(len(self.search_results) - 1, -1, -1):
+            result = self.search_results[i]
+            success = self.replace_callback(result, find_text, replace_text, options)
+            if success:
+                replaced_count += 1
+        
+        # Clear results and update display
+        self.search_results.clear()
+        self.results_listbox.delete(0, tk.END)
+        self.current_index = -1
+        self.results_label.config(text=f"Replaced {replaced_count} matches")
+    
+    def _close(self):
+        """Close the replace dialog."""
         self.dialog.destroy()
 
 

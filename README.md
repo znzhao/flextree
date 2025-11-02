@@ -732,6 +732,15 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Changelog
 
+### Version 0.2.0
+- **New Feature**: FlexTree JSON UI - A comprehensive graphical interface for viewing and exploring tree structures
+- Interactive tree navigation with expandable/collapsible nodes  
+- Advanced content editing with table view for dictionaries and lists
+- Complete clipboard operations with undo/redo system (20-step history)
+- Save/Save As with unsaved changes tracking and window title updates
+- Find and replace operations across node names and content
+- Comprehensive keyboard shortcuts and context menus
+
 ### Version 0.1.8
 - **New Feature**: Added copy and deep copy functionality for TreeNode and Tree classes
 - `TreeNode.copy()`: Create shallow copy of node without children

@@ -5,6 +5,29 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2025-11-02
+
+### Added
+- **NEW**: FlexTree JSON UI - A comprehensive graphical interface for viewing and exploring tree structures
+- Interactive tree navigation with expandable/collapsible nodes
+- Detailed node information viewer with tabbed interface (Overview, Content, Children)
+- Advanced content editing capabilities with support for text, dictionaries, and lists
+- Table view for dictionaries and lists of dictionaries with inline editing
+- Complete clipboard operations (cut, copy, paste, delete) with context menus
+- Undo/redo system with 20-step action history
+- Save/Save As functionality with unsaved changes tracking
+- Find and replace operations across node names and content
+- Automatic tab switching to Content tab when entering edit mode
+- Window title updates with filename and unsaved changes indicator (*)
+- Comprehensive keyboard shortcuts and right-click context menus
+
+### Enhanced
+- Tree viewer with expand/collapse all functionality
+- Node renaming with uniqueness validation
+- Content type detection and appropriate display formatting
+- File operations with proper unsaved changes handling
+- Status bar showing clipboard and action information
+
 ## [0.1.8] - 2025-11-01
 
 ### Added
