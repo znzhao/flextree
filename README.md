@@ -731,6 +731,8 @@ python -m flextree.jsonui
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Changelog
+### Verion 0.2.1
+- Fix multiple small issue with the UI shortcut.
 
 ### Version 0.2.0
 - **New Feature**: FlexTree JSON UI - A comprehensive graphical interface for viewing and exploring tree structures

@@ -609,7 +609,7 @@ class InfoViewerPanel(ttk.Frame):
         self.is_editing = False
         self.original_content = None  # Store original content for cancel functionality
 
-        # Note: Ctrl+L binding is now handled globally by the main UI
+        # Note: Ctrl+E binding is now handled globally by the main UI
 
     def _toggle_edit_mode(self):
         """Toggle edit mode on/off."""
@@ -1157,7 +1157,7 @@ class InfoViewerPanel(ttk.Frame):
         # Edit Mode Toggle
         if self.is_editing:
             context_menu.add_command(label="Exit Edit Mode",
-                                    accelerator="Ctrl+L",
+                                    accelerator="Ctrl+E",
                                     command=lambda: self._toggle_edit_mode_off())
             context_menu.add_separator()
             
@@ -1196,7 +1196,8 @@ class InfoViewerPanel(ttk.Frame):
             context_menu.add_command(label="Cancel Changes", 
                                    command=self._cancel_changes)
         else:
-            context_menu.add_command(label="Enter Edit Mode (Ctrl+L)", 
+            context_menu.add_command(label="Enter Edit Mode",
+                                   accelerator="Ctrl+E", 
                                    command=lambda: self._toggle_edit_mode_on())
         
         try:
