@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: flextree
-Version: 0.2.1
+Version: 0.3.0
 Summary: FlexTree - A flexible and intuitive Python library for creating and manipulating tree data structures
 Home-page: https://github.com/znzhao/flextree
 Author: Zhenning Zhao
@@ -312,7 +312,7 @@ Insert    - Add new child node
 
 **Content Editing**:
 ```
-Ctrl+L    - Toggle edit mode for node content
+Ctrl+E    - Toggle edit mode for node content
 Ctrl+Tab  - Switch between information tabs
 ```
 
@@ -393,7 +393,7 @@ node_content = [
 | `Ctrl+Y` | Redo |
 | `Del` | Delete node |
 | `Insert` | Insert new node |
-| `Ctrl+L` | Toggle edit mode |
+| `Ctrl+E` | Toggle edit mode |
 | `Ctrl+Tab` | Switch info tabs |
 
 ### Tips for Effective GUI Usage
@@ -764,6 +764,24 @@ python -m flextree.jsonui
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Changelog
+### Version 0.3.0
+- **ENHANCED**: ActionMemorySystem for comprehensive undo/redo operations across all tree modifications
+- Advanced Find and Replace functionality with dialog interface and search result navigation
+- Complete node renaming capabilities with direct inline editing in Overview tab
+- Support for complex nested structure editing (dictionaries within dictionaries, lists within lists)
+- Context menus for both tree viewer and content editor with comprehensive operation options
+- Keyboard shortcuts for common operations (Find, Replace, Edit Mode, Tab Navigation)
+- Content type auto-detection with appropriate display modes (text vs. table)
+- Support for editing list columns with rename and delete operations
+- Nested table expansion for viewing deeply nested data structures
+- Dialog-based value editing for complex JSON content with format validation
+- Status bar displaying clipboard state and action information
+- Window title updates reflecting current file and unsaved changes indicator
+- Action description system for undo history tracking
+- Create content type dialog for initializing new content (text, dict, list of dicts, null)
+- Preserve expansion state and selection when refreshing tree after modifications
+- Robust error handling with user-friendly error messages throughout UI operations
+
 ### Verion 0.2.1
 - Fix multiple small issue with the UI shortcut.
 

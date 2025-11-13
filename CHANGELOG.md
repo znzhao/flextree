@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2025-11-12
+
+### Added
+- **ENHANCED**: ActionMemorySystem for comprehensive undo/redo operations across all tree modifications
+- Advanced Find and Replace functionality with dialog interface and search result navigation
+- Complete node renaming capabilities with direct inline editing in Overview tab
+- Support for complex nested structure editing (dictionaries within dictionaries, lists within lists)
+- Context menus for both tree viewer and content editor with comprehensive operation options
+- Keyboard shortcuts for common operations (Find, Replace, Edit Mode, Tab Navigation)
+- Content type auto-detection with appropriate display modes (text vs. table)
+- Support for editing list columns with rename and delete operations
+- Nested table expansion for viewing deeply nested data structures
+- Dialog-based value editing for complex JSON content with format validation
+- Status bar displaying clipboard state and action information
+- Window title updates reflecting current file and unsaved changes indicator
+- Action description system for undo history tracking
+- Create content type dialog for initializing new content (text, dict, list of dicts, null)
+- Preserve expansion state and selection when refreshing tree after modifications
+- Robust error handling with user-friendly error messages throughout UI operations
+
+### Enhanced
+- TreeViewerPanel with improved context menus and expand/collapse all functionality
+- InfoViewerPanel with tabbed interface for Overview, Content, and Children information
+- Content editing workflow with modal dialogs and validation
+- File operations with proper unsaved changes detection and user prompts
+- Node information display with complete path, depth, width, and subtree statistics
+- Table display for dictionaries and lists of dictionaries with inline cell editing
+- Edit mode toggle with keyboard shortcut (Ctrl+E) and visual UI feedback
+- Tab navigation with Ctrl+Tab and Ctrl+Shift+Tab for quick switching
+- Save/Cancel workflow with original content preservation for safe editing
+- Children tab displays comprehensive statistics for each child node
+
+### Fixed
+- Shortcut handling improvements in UI interactions
+- State preservation during undo/redo operations
+- Content editing with proper validation and error recovery
+- Node selection persistence after tree modifications
+- Memory management in nested structure editing
+
 ## [0.2.1] - 2025-11-06
 
 ### Enhanced

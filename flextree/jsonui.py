@@ -783,50 +783,66 @@ class InfoViewerPanel(ttk.Frame):
             self._edit_node_name(item)
     
     def _edit_node_name(self, item_id):
-        """Edit the node name with validation."""
+        """Edit the node name directly in the table (inline editing)."""
         if not self.current_node:
             return
-        
+
+        # Get current value
         current_name = self.current_node.name
-        dialog = EditNodeNameDialog(self.overview_table, current_name)
-        
-        if dialog.result and dialog.result != current_name:
-            new_name = dialog.result.strip()
-            
-            # Validate the new name
+
+        # Get bounding box for the cell
+        bbox = self.overview_table.bbox(item_id, 'Value')
+        if not bbox:
+            return
+
+        x, y, width, height = bbox
+
+        # Create an Entry widget over the cell
+        entry = ttk.Entry(self.overview_table, width=max(10, width // 8))
+        entry.insert(0, current_name)
+        entry.select_range(0, tk.END)
+        entry.focus()
+
+        # Place the entry widget
+        entry.place(x=x, y=y, width=width, height=height)
+
+        def finish_edit(event=None):
+            new_name = entry.get().strip()
+            entry.destroy()
+            if new_name == current_name:
+                return
             if not new_name:
                 messagebox.showerror("Error", "Node name cannot be empty.")
                 return
-            
-            # Check if name is unique in the tree
-            if self._is_name_unique_in_tree(new_name):
-                try:
-                    # Record action for undo/redo
-                    if hasattr(self, 'record_action'):
-                        action_data = {'old_name': self.current_node.name, 'new_name': new_name}
-                        self.record_action('rename', action_data)
-                    
-                    # Update the node name
-                    old_name = self.current_node.name
-                    self.current_node.name = new_name
-                    
-                    # Update the overview display
-                    self.overview_table.set(item_id, 'Value', new_name)
-                    
-                    # Notify parent UI to refresh tree view
-                    self._notify_node_renamed(old_name, new_name)
-                    
-                    # Complete the action recording (if callback is available)
-                    if hasattr(self, 'complete_action'):
-                        self.complete_action()
-                    
-                    messagebox.showinfo("Success", f"Node renamed from '{old_name}' to '{new_name}'")
-                    
-                except Exception as e:
-                    messagebox.showerror("Error", f"Failed to rename node:\n{str(e)}")
-            else:
+            if not self._is_name_unique_in_tree(new_name):
                 messagebox.showerror("Error", f"Name '{new_name}' already exists in the tree. Please choose a unique name.")
-    
+                return
+            try:
+                # Record action for undo/redo
+                if hasattr(self, 'record_action'):
+                    action_data = {'old_name': self.current_node.name, 'new_name': new_name}
+                    self.record_action('rename', action_data)
+                # Update the node name
+                old_name = self.current_node.name
+                self.current_node.name = new_name
+                # Update the overview display
+                self.overview_table.set(item_id, 'Value', new_name)
+                # Notify parent UI to refresh tree view
+                self._notify_node_renamed(old_name, new_name)
+                # Complete the action recording (if callback is available)
+                if hasattr(self, 'complete_action'):
+                    self.complete_action()
+                messagebox.showinfo("Success", f"Node renamed from '{old_name}' to '{new_name}'")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to rename node:\n{str(e)}")
+
+        def cancel_edit(event=None):
+            entry.destroy()
+
+        entry.bind('<Return>', finish_edit)
+        entry.bind('<Escape>', cancel_edit)
+        entry.bind('<FocusOut>', cancel_edit)
+
     def _is_name_unique_in_tree(self, name):
         """Check if the given name is unique in the entire tree."""
         if not self.current_node:
@@ -911,10 +927,10 @@ class InfoViewerPanel(ttk.Frame):
                 self.current_node.set_content("")
             elif content_type == "dict":
                 # Create dictionary with sample data to enable table display
-                self.current_node.set_content({"key": "value"})
+                self.current_node.set_content({"(new key)": "(new value)"})
             elif content_type == "list_of_dict":
                 # Create list with sample dictionary to enable table display
-                self.current_node.set_content([{"key": "value"}])
+                self.current_node.set_content([{"(new key)": "(new value)"}])
             elif content_type == "null":
                 # Keep content as None (already set above)
                 pass
@@ -953,46 +969,104 @@ class InfoViewerPanel(ttk.Frame):
             messagebox.showwarning("Warning", "Item removal is only available in table mode.")
     
     def _add_dict_item(self):
-        """Add new key-value pair to dictionary."""
-        dialog = AddDictItemDialog(self.content_container)
-        if dialog.result:
-            key, value = dialog.result
+        """Add new key-value pair to dictionary with default key and value.
+        
+        If a sub-key/value is selected, adds to the parent dict/list that contains it.
+        If a sub-item is selected, adds to the parent list that contains it.
+        Otherwise, adds to the root content.
+        """
+        default_key = "(new key)"
+        default_value = "(new value)"
+        
+        try:
+            # Parse the default value
             try:
-                # Try to parse value as JSON first
-                try:
-                    parsed_value = json.loads(value)
-                except json.JSONDecodeError:
-                    # If not valid JSON, store as string
-                    parsed_value = value
-                
-                self.current_node.content[key] = parsed_value
-                self._update_content()
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to add item:\n{str(e)}")
+                parsed_value = json.loads(default_value)
+            except json.JSONDecodeError:
+                parsed_value = default_value
+            
+            # Check if there's a selected item in the table
+            target_dict = None
+            target_list = None
+            
+            if hasattr(self, 'content_table') and self.content_display_mode == "table":
+                selection = self.content_table.selection()
+                if selection:
+                    selected_item = selection[0]
+                    parent = self.content_table.parent(selected_item)
+                    key = self.content_table.item(selected_item, 'text')
+                    
+                    # Get the parent container that the selected item belongs to
+                    parent_value = self._get_nested_value(key, parent)
+                    
+                    # If parent is empty string, the selected item is at root level
+                    if parent == '':
+                        # The selected item is a key in the root dict, get its parent (root dict itself)
+                        target_dict = self.current_node.content if isinstance(self.current_node.content, dict) else None
+                    else:
+                        # Get the container that this selected item belongs to
+                        parent_container = self._get_nested_value(self.content_table.item(parent, 'text'), 
+                                                                   self.content_table.parent(parent))
+                        
+                        # If parent container is a dict, add to it
+                        if isinstance(parent_container, dict):
+                            target_dict = parent_container
+                        # If parent container is a list, add a new item to it
+                        elif isinstance(parent_container, list):
+                            if len(parent_container) > 0 and isinstance(parent_container[0], dict):
+                                # Add new dict item with same keys as first item
+                                new_item = {k: "(new value)" for k in parent_container[0].keys()}
+                            else:
+                                # For any other list type (including empty), append a simple value
+                                new_item = "(new value)"
+                            parent_container.append(new_item)
+                            self._update_content()
+                            return
+            
+            # If no nested target found, use root content
+            if target_dict is None:
+                if isinstance(self.current_node.content, dict):
+                    target_dict = self.current_node.content
+                else:
+                    messagebox.showwarning("Warning", "Root content is not a dictionary.")
+                    return
+            
+            # Add the new item to the target dict
+            target_dict[default_key] = parsed_value
+            self._update_content()
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to add item:\n{str(e)}")
     
     def _add_list_item(self):
-        """Add new item to list."""
+        """Add new item to list with default value for all existing keys."""
         if isinstance(self.current_node.content, list) and \
            len(self.current_node.content) > 0 and \
            isinstance(self.current_node.content[0], dict):
             # Adding to list of dictionaries
-            dialog = AddListItemDialog(self.content_container, self.current_node.content)
-            if dialog.result:
-                self.current_node.content.append(dialog.result)
-                self._update_content()
+            new_item = {key: "(new value)" for key in self.current_node.content[0].keys()}
+            self.current_node.content.append(new_item)
+            self._update_content()
         else:
             # Simple list item
-            dialog = AddSimpleItemDialog(self.content_container)
-            if dialog.result is not None:
-                self.current_node.content.append(dialog.result)
-                self._update_content()
+            self.current_node.content.append("(new value)")
+            self._update_content()
     
     def _remove_dict_item(self, item_id):
-        """Remove dictionary item."""
-        key = self.content_table.item(item_id, 'text')
-        if key in self.current_node.content:
-            del self.current_node.content[key]
+        """Remove dictionary item from the parent dict that contains it.
+        
+        If item is at root level, removes from root content dict.
+        If item is nested, removes from its parent dict.
+        """
+        try:
+            key = self.content_table.item(item_id, 'text')
+            parent = self.content_table.parent(item_id)
+            
+            # Use the existing _delete_nested_value method which handles nested structures
+            self._delete_nested_value(key, parent)
             self._update_content()
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to remove item:\n{str(e)}")
     
     def _remove_list_item(self, item_id):
         """Remove list item."""
@@ -1022,59 +1096,395 @@ class InfoViewerPanel(ttk.Frame):
             self._edit_list_item(row, column)
 
     def _edit_dict_item(self, row, column):
-        """Edit dictionary item."""
+        """Edit dictionary item with inline editing, supporting nested structures."""
         key = self.content_table.item(row, 'text')
+        parent = self.content_table.parent(row)
+        
+        # Get bounding box for the cell
+        bbox = self.content_table.bbox(row, column)
+        if not bbox:
+            return
+        
+        x, y, width, height = bbox
+        
         if column == '#1':  # Value column
-            current_value = self.current_node.content.get(key, "")
-            dialog = EditValueDialog(self.content_container, str(current_value))
-            if dialog.result is not None:
-                try:
-                    # Try to parse as JSON
+            current_value = self._get_nested_value(key, parent)
+            
+            # Check if value is a dict or list (should use nested editor)
+            if isinstance(current_value, (dict, list)):
+                # For nested structures, show a dialog to edit as JSON
+                dialog = EditValueDialog(self.content_container, json.dumps(current_value, ensure_ascii=False), "Edit Value")
+                if dialog.result is not None and dialog.result != json.dumps(current_value, ensure_ascii=False):
                     try:
                         parsed_value = json.loads(dialog.result)
-                    except json.JSONDecodeError:
-                        parsed_value = dialog.result
+                        self._set_nested_value(key, parent, parsed_value)
+                        self._update_content()
+                    except json.JSONDecodeError as e:
+                        messagebox.showerror("Error", f"Invalid JSON format:\n{str(e)}")
+            else:
+                # Simple value - use inline editing
+                entry = ttk.Entry(self.content_table, width=max(10, width // 8))
+                entry.insert(0, str(current_value))
+                entry.select_range(0, tk.END)
+                entry.focus()
+                entry.place(x=x, y=y, width=width, height=height)
+                
+                def finish_edit(event=None):
+                    new_value = entry.get().strip()
+                    entry.destroy()
+                    if new_value == str(current_value):
+                        return
                     
-                    self.current_node.content[key] = parsed_value
+                    try:
+                        # Try to parse as JSON
+                        try:
+                            parsed_value = json.loads(new_value)
+                        except json.JSONDecodeError:
+                            parsed_value = new_value
+                        
+                        self._set_nested_value(key, parent, parsed_value)
+                        self._update_content()
+                    except Exception as e:
+                        messagebox.showerror("Error", f"Failed to update value:\n{str(e)}")
+                
+                def cancel_edit(event=None):
+                    entry.destroy()
+                
+                entry.bind('<Return>', finish_edit)
+                entry.bind('<Escape>', cancel_edit)
+                entry.bind('<FocusOut>', cancel_edit)
+            
+        elif column == '#0':  # Key column
+            # Create an Entry widget over the cell
+            entry = ttk.Entry(self.content_table, width=max(10, width // 8))
+            entry.insert(0, key)
+            entry.select_range(0, tk.END)
+            entry.focus()
+            entry.place(x=x, y=y, width=width, height=height)
+            
+            def finish_edit(event=None):
+                new_key = entry.get().strip()
+                entry.destroy()
+                if new_key == key:
+                    return
+                if not new_key:
+                    messagebox.showerror("Error", "Key cannot be empty.")
+                    return
+                
+                # Check if new key already exists in the same parent context
+                if self._key_exists_in_parent(new_key, parent, key):
+                    messagebox.showerror("Error", f"Key '{new_key}' already exists.")
+                    return
+                
+                try:
+                    # Get the value to move
+                    current_value = self._get_nested_value(key, parent)
+                    # Remove old key
+                    self._delete_nested_value(key, parent)
+                    # Add with new key
+                    self._set_nested_value(new_key, parent, current_value)
                     self._update_content()
                 except Exception as e:
-                    messagebox.showerror("Error", f"Failed to update value:\n{str(e)}")
-        elif column == '#0':  # Key column
-            dialog = EditValueDialog(self.content_container, key, "Edit Key")
-            if dialog.result is not None and dialog.result != key:
-                # Rename key
-                value = self.current_node.content.pop(key)
-                self.current_node.content[dialog.result] = value
-                self._update_content()
+                    messagebox.showerror("Error", f"Failed to rename key:\n{str(e)}")
+            
+            def cancel_edit(event=None):
+                entry.destroy()
+            
+            entry.bind('<Return>', finish_edit)
+            entry.bind('<Escape>', cancel_edit)
+            entry.bind('<FocusOut>', cancel_edit)
+    
+    def _get_nested_value(self, key, parent_item):
+        """Get value from nested structure using parent item reference."""
+        # If parent is empty string, it's a top-level key
+        if parent_item == '':
+            if isinstance(self.current_node.content, dict):
+                return self.current_node.content.get(key)
+        else:
+            # Navigate through nested structure
+            path = self._get_path_to_item(parent_item)
+            current = self.current_node.content
+            
+            for path_key in path:
+                if isinstance(current, dict):
+                    current = current.get(path_key)
+                elif isinstance(current, list):
+                    try:
+                        idx = int(path_key)
+                        current = current[idx]
+                    except (ValueError, IndexError):
+                        return None
+                else:
+                    return None
+            
+            # Now get the final value
+            if isinstance(current, dict):
+                return current.get(key)
+            elif isinstance(current, list):
+                try:
+                    idx = int(key)
+                    return current[idx]
+                except (ValueError, IndexError):
+                    return None
+        
+        return None
+    
+    def _set_nested_value(self, key, parent_item, value):
+        """Set value in nested structure using parent item reference."""
+        if parent_item == '':
+            # Top-level key
+            if isinstance(self.current_node.content, dict):
+                self.current_node.content[key] = value
+        else:
+            # Navigate through nested structure
+            path = self._get_path_to_item(parent_item)
+            current = self.current_node.content
+            
+            for path_key in path:
+                if isinstance(current, dict):
+                    current = current.get(path_key)
+                elif isinstance(current, list):
+                    try:
+                        idx = int(path_key)
+                        current = current[idx]
+                    except (ValueError, IndexError):
+                        return
+                else:
+                    return
+            
+            # Set the final value
+            if isinstance(current, dict):
+                current[key] = value
+            elif isinstance(current, list):
+                try:
+                    idx = int(key)
+                    current[idx] = value
+                except (ValueError, IndexError):
+                    return
+    
+    def _delete_nested_value(self, key, parent_item):
+        """Delete value from nested structure."""
+        if parent_item == '':
+            if isinstance(self.current_node.content, dict):
+                if key in self.current_node.content:
+                    del self.current_node.content[key]
+        else:
+            path = self._get_path_to_item(parent_item)
+            current = self.current_node.content
+            
+            for path_key in path:
+                if isinstance(current, dict):
+                    current = current.get(path_key)
+                elif isinstance(current, list):
+                    try:
+                        idx = int(path_key)
+                        current = current[idx]
+                    except (ValueError, IndexError):
+                        return
+                else:
+                    return
+            
+            if isinstance(current, dict):
+                if key in current:
+                    del current[key]
+            elif isinstance(current, list):
+                try:
+                    idx = int(key)
+                    del current[idx]
+                except (ValueError, IndexError):
+                    return
+    
+    def _get_path_to_item(self, item_id):
+        """Get the path from root to an item as a list of keys/indices."""
+        path = []
+        current = item_id
+        while current != '':
+            parent = self.content_table.parent(current)
+            key = self.content_table.item(current, 'text')
+            path.insert(0, key)
+            current = parent
+        return path
+    
+    def _key_exists_in_parent(self, new_key, parent_item, exclude_key):
+        """Check if a key already exists in the parent context."""
+        parent_dict = None
+        
+        if parent_item == '':
+            parent_dict = self.current_node.content if isinstance(self.current_node.content, dict) else None
+        else:
+            path = self._get_path_to_item(parent_item)
+            current = self.current_node.content
+            
+            for path_key in path:
+                if isinstance(current, dict):
+                    current = current.get(path_key)
+                elif isinstance(current, list):
+                    try:
+                        idx = int(path_key)
+                        current = current[idx]
+                    except (ValueError, IndexError):
+                        return False
+                else:
+                    return False
+            
+            parent_dict = current if isinstance(current, dict) else None
+        
+        if parent_dict is None:
+            return False
+        
+        return new_key in parent_dict and new_key != exclude_key
 
     def _edit_list_item(self, row, column):
-        """Edit list item."""
+        """Edit list item with inline editing, supporting nested structures."""
         try:
             index = int(self.content_table.item(row, 'text'))
-            if isinstance(self.current_node.content[index], dict):
-                # Get column name
-                columns = ['#0'] + list(self.content_table['columns'])
+            parent = self.content_table.parent(row)
+            
+            # Get the list and item
+            if parent == '':
+                # Top-level list item
+                if isinstance(self.current_node.content, list) and 0 <= index < len(self.current_node.content):
+                    item = self.current_node.content[index]
+                else:
+                    return
+            else:
+                # Nested list item
+                path = self._get_path_to_item(parent)
+                current = self.current_node.content
+                
+                for path_key in path:
+                    if isinstance(current, dict):
+                        current = current.get(path_key)
+                    elif isinstance(current, list):
+                        try:
+                            idx = int(path_key)
+                            current = current[idx]
+                        except (ValueError, IndexError):
+                            return
+                    else:
+                        return
+                
+                if isinstance(current, list) and 0 <= index < len(current):
+                    item = current[index]
+                else:
+                    return
+            
+            if isinstance(item, dict):
+                # Dictionary item - edit specific column
                 if column == '#0':
                     return  # Can't edit index
                 
                 col_index = int(column.replace('#', '')) - 1
                 if col_index < len(self.content_table['columns']):
                     col_name = self.content_table['columns'][col_index]
-                    current_value = self.current_node.content[index].get(col_name, "")
+                    current_value = item.get(col_name, "")
                     
-                    dialog = EditValueDialog(self.content_container, str(current_value))
-                    if dialog.result is not None:
-                        try:
-                            # Try to parse as JSON
+                    # Get bounding box for the cell
+                    bbox = self.content_table.bbox(row, column)
+                    if not bbox:
+                        return
+                    
+                    x, y, width, height = bbox
+                    
+                    # Check if value is a dict or list
+                    if isinstance(current_value, (dict, list)):
+                        # Use dialog for nested structures
+                        dialog = EditValueDialog(self.content_container, json.dumps(current_value, ensure_ascii=False), "Edit Value")
+                        if dialog.result is not None and dialog.result != json.dumps(current_value, ensure_ascii=False):
                             try:
                                 parsed_value = json.loads(dialog.result)
-                            except json.JSONDecodeError:
-                                parsed_value = dialog.result
+                                item[col_name] = parsed_value
+                                self._update_content()
+                            except json.JSONDecodeError as e:
+                                messagebox.showerror("Error", f"Invalid JSON format:\n{str(e)}")
+                    else:
+                        # Simple value - inline editing
+                        entry = ttk.Entry(self.content_table, width=max(10, width // 8))
+                        entry.insert(0, str(current_value))
+                        entry.select_range(0, tk.END)
+                        entry.focus()
+                        entry.place(x=x, y=y, width=width, height=height)
+                        
+                        def finish_edit(event=None):
+                            new_value = entry.get().strip()
+                            entry.destroy()
+                            if new_value == str(current_value):
+                                return
                             
-                            self.current_node.content[index][col_name] = parsed_value
-                            self._update_content()
-                        except Exception as e:
-                            messagebox.showerror("Error", f"Failed to update value:\n{str(e)}")
+                            try:
+                                # Try to parse as JSON
+                                try:
+                                    parsed_value = json.loads(new_value)
+                                except json.JSONDecodeError:
+                                    parsed_value = new_value
+                                
+                                item[col_name] = parsed_value
+                                self._update_content()
+                            except Exception as e:
+                                messagebox.showerror("Error", f"Failed to update value:\n{str(e)}")
+                        
+                        def cancel_edit(event=None):
+                            entry.destroy()
+                        
+                        entry.bind('<Return>', finish_edit)
+                        entry.bind('<Escape>', cancel_edit)
+                        entry.bind('<FocusOut>', cancel_edit)
+            else:
+                # Simple value item - edit as string
+                if column == '#0':
+                    return  # Can't edit index
+                
+                col_index = int(column.replace('#', '')) - 1
+                if col_index < len(self.content_table['columns']):
+                    col_name = self.content_table['columns'][col_index]
+                    current_value = item
+                    
+                    bbox = self.content_table.bbox(row, column)
+                    if not bbox:
+                        return
+                    
+                    x, y, width, height = bbox
+                    
+                    # Check if value is a dict or list
+                    if isinstance(current_value, (dict, list)):
+                        dialog = EditValueDialog(self.content_container, json.dumps(current_value, ensure_ascii=False), "Edit Value")
+                        if dialog.result is not None and dialog.result != json.dumps(current_value, ensure_ascii=False):
+                            try:
+                                parsed_value = json.loads(dialog.result)
+                                self.current_node.content[index] = parsed_value
+                                self._update_content()
+                            except json.JSONDecodeError as e:
+                                messagebox.showerror("Error", f"Invalid JSON format:\n{str(e)}")
+                    else:
+                        entry = ttk.Entry(self.content_table, width=max(10, width // 8))
+                        entry.insert(0, str(current_value))
+                        entry.select_range(0, tk.END)
+                        entry.focus()
+                        entry.place(x=x, y=y, width=width, height=height)
+                        
+                        def finish_edit(event=None):
+                            new_value = entry.get().strip()
+                            entry.destroy()
+                            if new_value == str(current_value):
+                                return
+                            
+                            try:
+                                try:
+                                    parsed_value = json.loads(new_value)
+                                except json.JSONDecodeError:
+                                    parsed_value = new_value
+                                
+                                self.current_node.content[index] = parsed_value
+                                self._update_content()
+                            except Exception as e:
+                                messagebox.showerror("Error", f"Failed to update value:\n{str(e)}")
+                        
+                        def cancel_edit(event=None):
+                            entry.destroy()
+                        
+                        entry.bind('<Return>', finish_edit)
+                        entry.bind('<Escape>', cancel_edit)
+                        entry.bind('<FocusOut>', cancel_edit)
         except (ValueError, IndexError, KeyError) as e:
             messagebox.showerror("Error", f"Failed to edit item:\n{str(e)}")
     
@@ -1097,7 +1507,7 @@ class InfoViewerPanel(ttk.Frame):
                         item[new_key] = item.pop(old_key)
                 
                 self._update_content()
-    
+
     def _on_table_header_double_click(self, event):
         """Handle double-click on table header for column renaming."""
         if not self.is_editing or not isinstance(self.current_node.content, list):
@@ -1480,36 +1890,62 @@ class InfoViewerPanel(ttk.Frame):
             self.content_text.config(state=tk.DISABLED)
     
     def _display_content_as_table(self, data):
-        """Display dictionary content as a table."""
+        """Display dictionary content as a table, with expandable subtables for dict/list values."""
         # Clear container and create table widget if needed
         if self.content_display_mode != "table":
             self._clear_content_container()
             self._create_content_table_widget()
             self.content_display_mode = "table"
-        
+
         # Clear existing items
         for item in self.content_table.get_children():
             self.content_table.delete(item)
-        
+
         # Configure columns for key-value display
         self.content_table.configure(columns=('Value',))
         self.content_table.heading('#0', text='Key', anchor='w')
         self.content_table.heading('Value', text='Value', anchor='w')
-        self.content_table.column('#0', width=200, minwidth=150)
-        self.content_table.column('Value', width=300, minwidth=200)
-        
+        self.content_table.column('#0', width=200, minwidth=100)
+        self.content_table.column('Value', width=400, minwidth=300)
+
+        # Helper to add subtable for dict/list values
+        def add_subtable(parent_id, value):
+            if isinstance(value, dict):
+                for k, v in value.items():
+                    if isinstance(v, (dict, list)):
+                        sub_id = self.content_table.insert(parent_id, tk.END, text=str(k), values=("[expand]",))
+                        add_subtable(sub_id, v)
+                    else:
+                        self.content_table.insert(parent_id, tk.END, text=str(k), values=(str(v),))
+            elif isinstance(value, list):
+                for idx, v in enumerate(value):
+                    if isinstance(v, (dict, list)):
+                        sub_id = self.content_table.insert(parent_id, tk.END, text=str(idx), values=("[expand]",))
+                        add_subtable(sub_id, v)
+                    else:
+                        self.content_table.insert(parent_id, tk.END, text=str(idx), values=(str(v),))
+
         # Populate table with dictionary data
         for key, value in data.items():
-            # Format complex values
-            if isinstance(value, (dict, list, tuple)):
-                display_value = json.dumps(value, ensure_ascii=False)
-                if len(display_value) > 100:
-                    display_value = display_value[:100] + "..."
+            if isinstance(value, dict):
+                # Insert parent row, then add subtable as children
+                parent_id = self.content_table.insert('', tk.END, text=str(key), values=("[expand]",))
+                add_subtable(parent_id, value)
+            elif isinstance(value, list):
+                parent_id = self.content_table.insert('', tk.END, text=str(key), values=("[expand]",))
+                add_subtable(parent_id, value)
             else:
                 display_value = str(value)
-            
-            self.content_table.insert('', tk.END, text=str(key), values=(display_value,))
-    
+                self.content_table.insert('', tk.END, text=str(key), values=(display_value,))
+
+        # Optionally expand all rows by default
+        def expand_all(item):
+            self.content_table.item(item, open=True)
+            for child in self.content_table.get_children(item):
+                expand_all(child)
+        for item in self.content_table.get_children():
+            expand_all(item)
+
     def _display_list_as_table(self, data):
         """Display list of dictionaries as a table."""
         # Clear container and create table widget if needed
@@ -1629,7 +2065,6 @@ class InfoViewerPanel(ttk.Frame):
         # Clear children treeview
         for item in self.children_tree.get_children():
             self.children_tree.delete(item)
-
 
 class FlexTreeUI:
     """
@@ -3207,7 +3642,6 @@ class EditNodeNameDialog:
         self.result = None
         self.dialog.destroy()
 
-
 class EditValueDialog:
     """Dialog for editing a single value."""
     
@@ -3256,156 +3690,6 @@ class EditValueDialog:
     def _cancel_clicked(self):
         self.result = None
         self.dialog.destroy()
-
-
-class AddDictItemDialog:
-    """Dialog for adding a new key-value pair to a dictionary."""
-    
-    def __init__(self, parent):
-        self.result = None
-        
-        # Create dialog window
-        self.dialog = tk.Toplevel(parent)
-        self.dialog.title("Add New Item")
-        self.dialog.geometry("400x200")
-        self.dialog.transient(parent.winfo_toplevel())
-        self.dialog.grab_set()
-        
-        # Center the dialog
-        self.dialog.geometry("+%d+%d" % (
-            parent.winfo_rootx() + 50,
-            parent.winfo_rooty() + 50
-        ))
-        
-        # Create and pack widgets
-        ttk.Label(self.dialog, text="Key:").pack(pady=(10, 5))
-        self.key_entry = ttk.Entry(self.dialog, width=50)
-        self.key_entry.pack(pady=5, padx=20, fill=tk.X)
-        
-        ttk.Label(self.dialog, text="Value (JSON format or plain text):").pack(pady=(10, 5))
-        self.value_entry = ttk.Entry(self.dialog, width=50)
-        self.value_entry.pack(pady=5, padx=20, fill=tk.X)
-        
-        # Buttons
-        button_frame = ttk.Frame(self.dialog)
-        button_frame.pack(pady=15)
-        
-        ttk.Button(button_frame, text="OK", command=self._ok_clicked).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Cancel", command=self._cancel_clicked).pack(side=tk.LEFT, padx=5)
-        
-        # Bind Enter key
-        self.value_entry.bind('<Return>', lambda e: self._ok_clicked())
-        self.key_entry.focus()
-        
-        # Wait for dialog to close
-        self.dialog.wait_window()
-    
-    def _ok_clicked(self):
-        key = self.key_entry.get().strip()
-        value = self.value_entry.get()
-        
-        if not key:
-            messagebox.showwarning("Warning", "Key cannot be empty.")
-            return
-        
-        self.result = (key, value)
-        self.dialog.destroy()
-    
-    def _cancel_clicked(self):
-        self.result = None
-        self.dialog.destroy()
-
-class AddListItemDialog:
-    """Dialog for adding a new item to a list of dictionaries."""
-    
-    def __init__(self, parent, existing_list):
-        self.result = None
-        self.existing_list = existing_list
-        
-        # Get all unique keys from existing items
-        self.all_keys = set()
-        for item in existing_list:
-            if isinstance(item, dict):
-                self.all_keys.update(item.keys())
-        self.all_keys = sorted(list(self.all_keys))
-        
-        # Create dialog window
-        self.dialog = tk.Toplevel(parent)
-        self.dialog.title("Add New List Item")
-        self.dialog.geometry("500x400")
-        self.dialog.transient(parent.winfo_toplevel())
-        self.dialog.grab_set()
-        
-        # Center the dialog
-        self.dialog.geometry("+%d+%d" % (
-            parent.winfo_rootx() + 50,
-            parent.winfo_rooty() + 50
-        ))
-        
-        # Create scrollable frame
-        canvas = tk.Canvas(self.dialog)
-        scrollbar = ttk.Scrollbar(self.dialog, orient="vertical", command=canvas.yview)
-        scrollable_frame = ttk.Frame(canvas)
-        
-        scrollable_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        
-        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
-        # Create entry fields for each key
-        ttk.Label(scrollable_frame, text="Enter values for new item:", font=('Arial', 10, 'bold')).pack(pady=10)
-        
-        self.entries = {}
-        for key in self.all_keys:
-            frame = ttk.Frame(scrollable_frame)
-            frame.pack(fill=tk.X, padx=20, pady=2)
-            
-            ttk.Label(frame, text=f"{key}:", width=15).pack(side=tk.LEFT)
-            entry = ttk.Entry(frame, width=40)
-            entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(5, 0))
-            self.entries[key] = entry
-        
-        # Pack canvas and scrollbar
-        canvas.pack(side="left", fill="both", expand=True, padx=(20, 0), pady=20)
-        scrollbar.pack(side="right", fill="y", pady=20)
-        
-        # Buttons
-        button_frame = ttk.Frame(self.dialog)
-        button_frame.pack(pady=10)
-        
-        ttk.Button(button_frame, text="OK", command=self._ok_clicked).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Cancel", command=self._cancel_clicked).pack(side=tk.LEFT, padx=5)
-        
-        # Focus first entry
-        if self.entries:
-            next(iter(self.entries.values())).focus()
-        
-        # Wait for dialog to close
-        self.dialog.wait_window()
-    
-    def _ok_clicked(self):
-        new_item = {}
-        for key, entry in self.entries.items():
-            value = entry.get()
-            if value:  # Only add non-empty values
-                try:
-                    # Try to parse as JSON
-                    parsed_value = json.loads(value)
-                except json.JSONDecodeError:
-                    # If not valid JSON, store as string
-                    parsed_value = value
-                new_item[key] = parsed_value
-        
-        self.result = new_item
-        self.dialog.destroy()
-    
-    def _cancel_clicked(self):
-        self.result = None
-        self.dialog.destroy()
-
 
 class CreateContentTypeDialog:
     """Dialog for choosing the type of new content to create."""
@@ -3456,9 +3740,9 @@ class CreateContentTypeDialog:
         # List of dictionaries option
         list_dict_frame = ttk.Frame(options_frame)
         list_dict_frame.pack(fill=tk.X, pady=5)
-        ttk.Radiobutton(list_dict_frame, text="List of Dictionaries", variable=self.content_type_var, 
+        ttk.Radiobutton(list_dict_frame, text="List or Table", variable=self.content_type_var, 
                        value="list_of_dict").pack(anchor=tk.W)
-        ttk.Label(list_dict_frame, text="   Array of objects (table-like data)", 
+        ttk.Label(list_dict_frame, text="   Array of objects or table-like data", 
                  font=('Arial', 8), foreground='gray').pack(anchor=tk.W)
         
         # Null option
@@ -3489,61 +3773,6 @@ class CreateContentTypeDialog:
     def _cancel_clicked(self):
         self.result = None
         self.dialog.destroy()
-
-
-class AddSimpleItemDialog:
-    """Dialog for adding a simple item to a list."""
-    
-    def __init__(self, parent):
-        self.result = None
-        
-        # Create dialog window
-        self.dialog = tk.Toplevel(parent)
-        self.dialog.title("Add New Item")
-        self.dialog.geometry("400x150")
-        self.dialog.transient(parent.winfo_toplevel())
-        self.dialog.grab_set()
-        
-        # Center the dialog
-        self.dialog.geometry("+%d+%d" % (
-            parent.winfo_rootx() + 50,
-            parent.winfo_rooty() + 50
-        ))
-        
-        # Create and pack widgets
-        ttk.Label(self.dialog, text="Enter new item value (JSON format or plain text):").pack(pady=10)
-        
-        self.entry = ttk.Entry(self.dialog, width=50)
-        self.entry.pack(pady=5, padx=20, fill=tk.X)
-        
-        # Buttons
-        button_frame = ttk.Frame(self.dialog)
-        button_frame.pack(pady=10)
-        
-        ttk.Button(button_frame, text="OK", command=self._ok_clicked).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="Cancel", command=self._cancel_clicked).pack(side=tk.LEFT, padx=5)
-        
-        # Bind Enter key
-        self.entry.bind('<Return>', lambda e: self._ok_clicked())
-        self.entry.focus()
-        
-        # Wait for dialog to close
-        self.dialog.wait_window()
-    
-    def _ok_clicked(self):
-        value = self.entry.get()
-        try:
-            # Try to parse as JSON
-            self.result = json.loads(value)
-        except json.JSONDecodeError:
-            # If not valid JSON, store as string
-            self.result = value
-        self.dialog.destroy()
-    
-    def _cancel_clicked(self):
-        self.result = None
-        self.dialog.destroy()
-
 
 class SearchDialog:
     """Dialog for searching nodes and content with various options."""
