@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2025-11-13
+
+### Added
+- **ENHANCED**: Cut/Copy/Paste/Delete keyboard shortcuts now work during inline node name editing
+- Entry widget focus detection for seamless inline editing experience
+- Smart routing for keyboard operations that detects editing context
+
+### Enhanced
+- Keyboard operation handlers (`_handle_cut`, `_handle_copy`, `_handle_paste`, `_handle_delete`) now check for Entry widget focus
+- Cut/Copy/Paste/Delete now support three contexts: inline node editing, content text editing, and tree node operations
+- Prioritized routing order: inline editing > content text editing > tree operations
+- All text operations properly handle no-selection cases with graceful fallbacks
+- Support for text deletion at cursor position when no text is selected
+
+### Fixed
+- Keyboard shortcuts now work correctly during node name inline editing
+- Text selection and manipulation in Entry widgets during inline node renaming
+
 ## [0.3.0] - 2025-11-12
 
 ### Added
