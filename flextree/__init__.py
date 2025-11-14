@@ -9,7 +9,7 @@ from .flextree import TreeNode, Tree, draw_tree
 from .examples import examples
 from .jsonui import FlexTreeUI
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"
 __author__ = "Zhenning Zhao"
 __email__ = "znzhaopersonal@gmail.com"
 

@@ -255,10 +255,9 @@ class TestTreeNode(unittest.TestCase):
             output = captured_output.getvalue()
             
             # Check that output contains expected elements
-            self.assertIn("root:", output)
-            self.assertIn("child1:", output)
-            self.assertIn("grandchild:", output)
-            self.assertIn("gc content", output)
+            self.assertIn("root", output)
+            self.assertIn("child1", output)
+            self.assertIn("grandchild", output)
             
         finally:
             sys.stdout = old_stdout
@@ -356,6 +355,51 @@ class TestTreeNode(unittest.TestCase):
         self.assertIsNot(copied, original)
         self.assertIsNot(copied.content, original.content)
         self.assertEqual(len(copied.children), 0)
+    
+    def test_contains(self):
+        """Test __contains__ method for TreeNode."""
+        root = TreeNode("root")
+        child = TreeNode("child")
+        grandchild = TreeNode("grandchild")
+        
+        root.add_child(child)
+        child.add_child(grandchild)
+        
+        # Test finding nodes in subtree
+        self.assertTrue("root" in root)
+        self.assertTrue("child" in root)
+        self.assertTrue("grandchild" in root)
+        self.assertFalse("nonexistent" in root)
+        
+        # Test from child perspective
+        self.assertTrue("child" in child)
+        self.assertTrue("grandchild" in child)
+        self.assertFalse("root" in child)
+        
+        # Test leaf node
+        self.assertTrue("grandchild" in grandchild)
+        self.assertFalse("child" in grandchild)
+    
+    def test_is_leaf(self):
+        """Test is_leaf method for TreeNode."""
+        root = TreeNode("root")
+        child = TreeNode("child")
+        grandchild = TreeNode("grandchild")
+        
+        # Initially all nodes are leaves
+        self.assertTrue(root.is_leaf())
+        self.assertTrue(child.is_leaf())
+        self.assertTrue(grandchild.is_leaf())
+        
+        # After adding children, root and child are no longer leaves
+        root.add_child(child)
+        self.assertFalse(root.is_leaf())
+        self.assertTrue(child.is_leaf())
+        
+        child.add_child(grandchild)
+        self.assertFalse(root.is_leaf())
+        self.assertFalse(child.is_leaf())
+        self.assertTrue(grandchild.is_leaf())
 
 
 class TestTree(unittest.TestCase):
@@ -658,10 +702,9 @@ class TestTree(unittest.TestCase):
             output = captured_output.getvalue()
             
             # Check that output contains expected elements
-            self.assertIn("root:", output)
-            self.assertIn("child:", output)
-            self.assertIn("grandchild:", output)
-            self.assertIn("gc content", output)
+            self.assertIn("root", output)
+            self.assertIn("child", output)
+            self.assertIn("grandchild", output)
             
         finally:
             sys.stdout = old_stdout
@@ -816,9 +859,72 @@ class TestTree(unittest.TestCase):
         self.assertEqual(len(deep.children), 1)
         self.assertEqual(deep.children[0].name, "child")
         self.assertIsNone(deep.children[0].content)
+    
+    def test_tree_contains(self):
+        """Test __contains__ method for Tree."""
+        root = TreeNode("root")
+        tree = Tree(root)
+        
+        child = TreeNode("child")
+        grandchild = TreeNode("grandchild")
+        
+        tree.insert("root", child)
+        tree.insert("child", grandchild)
+        
+        # Test finding nodes in tree
+        self.assertTrue("root" in tree)
+        self.assertTrue("child" in tree)
+        self.assertTrue("grandchild" in tree)
+        self.assertFalse("nonexistent" in tree)
+    
+    def test_tree_is_leaf(self):
+        """Test is_leaf method for Tree."""
+        root = TreeNode("root")
+        tree = Tree(root)
+        
+        child = TreeNode("child")
+        grandchild = TreeNode("grandchild")
+        
+        # Root is initially a leaf
+        self.assertTrue(tree.is_leaf("root"))
+        
+        # After adding children
+        tree.insert("root", child)
+        self.assertFalse(tree.is_leaf("root"))
+        self.assertTrue(tree.is_leaf("child"))
+        
+        # Add grandchild
+        tree.insert("child", grandchild)
+        self.assertFalse(tree.is_leaf("root"))
+        self.assertFalse(tree.is_leaf("child"))
+        self.assertTrue(tree.is_leaf("grandchild"))
+        
+        # Test nonexistent node returns False
+        self.assertFalse(tree.is_leaf("nonexistent"))
+    
+    def test_getitem_list_invalid_keys(self):
+        """Test __getitem__ with list containing invalid key types."""
+        root = TreeNode("root")
+        tree = Tree(root)
+        
+        child1 = TreeNode("child1", "content1")
+        child2 = TreeNode("child2", "content2")
+        tree.insert("root", child1)
+        tree.insert("root", child2)
+        
+        # Test that TypeError is raised for non-string keys in list
+        with self.assertRaises(TypeError) as context:
+            tree[[0, 1]]  # List with integers instead of strings
+        
+        self.assertIn("List keys must be strings", str(context.exception))
+        
+        # Test mixed string and non-string keys
+        with self.assertRaises(TypeError) as context:
+            tree[["child1", 0]]  # Mix of string and integer
+        
+        self.assertIn("List keys must be strings", str(context.exception))
 
 class TestDrawTree(unittest.TestCase):
-    
     def test_draw_tree_output(self):
         """Test that draw_tree produces output without errors."""
         root = TreeNode("root", "root content")
@@ -839,11 +945,10 @@ class TestDrawTree(unittest.TestCase):
             output = captured_output.getvalue()
             
             # Check that output contains expected elements
-            self.assertIn("root:", output)
-            self.assertIn("child1:", output)
-            self.assertIn("child2:", output)
-            self.assertIn("grandchild:", output)
-            self.assertIn("test definition", output)
+            self.assertIn("root", output)
+            self.assertIn("child1", output)
+            self.assertIn("child2", output)
+            self.assertIn("grandchild", output)
             
         finally:
             sys.stdout = old_stdout
@@ -873,7 +978,7 @@ class TestDrawTree(unittest.TestCase):
             sys.stdout = old_stdout
     
     def test_draw_tree_nonexistent_key(self):
-        """Test draw_tree with nonexistent key shows full dict."""
+        """Test draw_tree with nonexistent key shows node name only."""
         root = TreeNode("root", {"data": "some data", "value": 42})
         
         old_stdout = sys.stdout
@@ -883,8 +988,10 @@ class TestDrawTree(unittest.TestCase):
             draw_tree(root, key="nonexistent")
             output = captured_output.getvalue()
             
-            # Should display the entire dictionary since key doesn't exist
-            self.assertIn("{'data': 'some data', 'value': 42}", output)
+            # Should display just the node name since key doesn't exist in dict
+            self.assertIn("root", output)
+            # Should not show the dict content since key wasn't found
+            self.assertNotIn("{'data'", output)
             
         finally:
             sys.stdout = old_stdout
@@ -907,16 +1014,16 @@ class TestDrawTree(unittest.TestCase):
             draw_tree(root, key="custom_key")
             output = captured_output.getvalue()
             
-            # String content should remain unchanged
-            self.assertIn("string content", output)
-            self.assertIn("another string", output)
+            # All node names should be present
+            self.assertIn("root", output)
+            self.assertIn("dict_child", output)
+            self.assertIn("string_child", output)
+            self.assertIn("none_child", output)
             # Dict with custom key should show only that value
             self.assertIn("custom value", output)
             # Check that the full dictionary is not displayed (would contain 'other': 'data')
             self.assertNotIn("'other': 'data'", output)
             self.assertNotIn('"other": "data"', output)
-            # None content should display as None
-            self.assertIn("None", output)
             
         finally:
             sys.stdout = old_stdout

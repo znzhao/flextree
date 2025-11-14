@@ -393,6 +393,55 @@ class TreeNode:
         """
         return f"TreeNode(name={self.name}, children={len(self.children)})"
 
+    def __contains__(self, name: str) -> bool:
+        """
+        Check if a node with the given name exists in this node's subtree.
+        
+        This method enables the 'in' operator for TreeNode objects, allowing
+        convenient checking of whether a node name exists in the subtree.
+        
+        Args:
+            name (str): The name of the node to search for
+            
+        Returns:
+            bool: True if a node with the given name exists in the subtree,
+                  False otherwise
+                  
+        Example:
+            >>> root = TreeNode("root")
+            >>> child = TreeNode("child")
+            >>> grandchild = TreeNode("grandchild")
+            >>> root.add_child(child)
+            >>> child.add_child(grandchild)
+            >>> "child" in root
+            True
+            >>> "grandchild" in root
+            True
+            >>> "nonexistent" in root
+            False
+        """
+        return self.get_subtree(name) is not None
+
+    def is_leaf(self) -> bool:
+        """
+        Check if this node is a leaf node (has no children).
+        
+        A leaf node is a node with no children in the tree structure.
+        
+        Returns:
+            bool: True if this node has no children, False otherwise
+                  
+        Example:
+            >>> root = TreeNode("root")
+            >>> child = TreeNode("child")
+            >>> root.add_child(child)
+            >>> root.is_leaf()
+            False
+            >>> child.is_leaf()
+            True
+        """
+        return len(self.children) == 0
+
     def draw(self, key: str = None):
         """
         Print an ASCII art representation of the tree structure.
@@ -605,6 +654,68 @@ class Tree:
             str: A string showing the root node, tree depth, and width
         """
         return f"Tree(root={self.root}, depth={self.max_depth()}, width={self.max_width()})"
+
+    def __contains__(self, name: str) -> bool:
+        """
+        Check if a node with the given name exists in the tree.
+        
+        This method enables the 'in' operator for Tree objects, allowing
+        convenient checking of whether a node name exists anywhere in the tree.
+        
+        Args:
+            name (str): The name of the node to search for
+            
+        Returns:
+            bool: True if a node with the given name exists in the tree,
+                  False otherwise
+                  
+        Example:
+            >>> root = TreeNode("root")
+            >>> child = TreeNode("child")
+            >>> root.add_child(child)
+            >>> tree = Tree(root)
+            >>> "root" in tree
+            True
+            >>> "child" in tree
+            True
+            >>> "nonexistent" in tree
+            False
+        """
+        return name in self.root
+
+    def is_leaf(self, name: str) -> bool:
+        """
+        Check if a node with the given name is a leaf node.
+        
+        A leaf node is a node with no children in the tree structure.
+        
+        Args:
+            name (str): The name of the node to check
+            
+        Returns:
+            bool: True if the node is a leaf (has no children), 
+                  False if it has children or doesn't exist
+                  
+        Example:
+            >>> root = TreeNode("root")
+            >>> child = TreeNode("child")
+            >>> grandchild = TreeNode("grandchild")
+            >>> root.add_child(child)
+            >>> child.add_child(grandchild)
+            >>> tree = Tree(root)
+            >>> tree.is_leaf("root")
+            False
+            >>> tree.is_leaf("child")
+            False
+            >>> tree.is_leaf("grandchild")
+            True
+            >>> tree.is_leaf("nonexistent")
+            False
+        """
+        node = self.root.get_subtree(name)
+        if node is None:
+            return False
+        return node.is_leaf()
 
     def save_json(self, filepath: str):
         """
@@ -828,11 +939,13 @@ def draw_tree(node: TreeNode, prefix: str = "", is_last: bool = True, key: str =
         that value will be displayed instead of the entire dictionary.
     """
     connector = "\u2514\u2500\u2500 " if is_last else "\u251c\u2500\u2500 "
-    content_display = node.content
+    content_display = None
     if isinstance(node.content, dict) and key in node.content:
         content_display = node.content[key]
-    
-    print(prefix + connector + f"{node.name}: {content_display}")
+    if content_display is None:
+        print(prefix + connector + f"{node.name}")
+    else:
+        print(prefix + connector + f"{node.name}: {content_display}")
     new_prefix = prefix + ("    " if is_last else "│   ")
     for i, child in enumerate(node.children):
         draw_tree(child, new_prefix, i == len(node.children) - 1, key)

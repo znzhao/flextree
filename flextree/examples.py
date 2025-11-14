@@ -8,6 +8,7 @@ Run: python examples.py
 """
 
 import os
+import tempfile
 from flextree import TreeNode, Tree, draw_tree
 
 def quick_start_example():
@@ -219,6 +220,143 @@ def getitem_indexing_example():
     print("   - List keys must be strings only: tree[['name1', 'name2']]")
     print("   - Makes tree navigation feel like native Python!")
 
+def remove_and_search_example():
+    """Demonstrate remove_child and search operations."""
+    print("\n" + "=" * 40)
+    print("Remove Child & Search Operations")
+    print("=" * 40)
+    
+    # 1. Remove child by different methods
+    print("1. Removing children in different ways:")
+    print("CODE:")
+    print('   manager = TreeNode("Manager", "John")')
+    print('   dev1 = TreeNode("Dev1", "Alice")')
+    print('   dev2 = TreeNode("Dev2", "Bob")')
+    print('   dev3 = TreeNode("Dev3", "Charlie")')
+    print()
+    print('   manager.add_child(dev1)')
+    print('   manager.add_child(dev2)')
+    print('   manager.add_child(dev3)')
+    print('   print(f"Before: {len(manager.children)} developers")')
+    print()
+    print('   # Remove by node reference')
+    print('   manager.remove_child(dev1)')
+    print('   print(f"After removing by node: {len(manager.children)}")')
+    print()
+    print('   # Remove by name')
+    print('   manager.remove_child("Dev2")')
+    print('   print(f"After removing by name: {len(manager.children)}")')
+    print()
+    print('   # Remove by index')
+    print('   manager.remove_child(0)  # Remove first remaining child')
+    print('   print(f"After removing by index: {len(manager.children)}")')
+    print()
+    
+    manager = TreeNode("Manager", "John")
+    dev1 = TreeNode("Dev1", "Alice")
+    dev2 = TreeNode("Dev2", "Bob")
+    dev3 = TreeNode("Dev3", "Charlie")
+    
+    manager.add_child(dev1)
+    manager.add_child(dev2)
+    manager.add_child(dev3)
+    
+    print("OUTPUT:")
+    print(f"   Before: {len(manager.children)} developers")
+    
+    manager.remove_child(dev1)
+    print(f"   After removing by node: {len(manager.children)}")
+    
+    manager.remove_child("Dev2")
+    print(f"   After removing by name: {len(manager.children)}")
+    
+    manager.remove_child(0)
+    print(f"   After removing by index: {len(manager.children)}")
+    
+    # 2. Search operations with 'in' operator
+    print("\n2. Using 'in' operator to search for nodes:")
+    print("CODE:")
+    print('   org = TreeNode("Company", "TechCorp")')
+    print('   eng = TreeNode("Engineering", "Tech")')
+    print('   backend = TreeNode("Backend", "Servers")')
+    print('   frontend = TreeNode("Frontend", "UI")')
+    print()
+    print('   org.add_child(eng)')
+    print('   eng.add_child(backend)')
+    print('   eng.add_child(frontend)')
+    print()
+    print('   # Check if nodes exist anywhere in subtree')
+    print('   print(f"Engineering in org: {"Engineering" in org}")')
+    print('   print(f"Backend in org: {"Backend" in org}")')
+    print('   print(f"Marketing in org: {"Marketing" in org}")')
+    print('   print(f"Backend in backend node: {"Backend" in backend}")')
+    print()
+    
+    org = TreeNode("Company", "TechCorp")
+    eng = TreeNode("Engineering", "Tech")
+    backend = TreeNode("Backend", "Servers")
+    frontend = TreeNode("Frontend", "UI")
+    
+    org.add_child(eng)
+    eng.add_child(backend)
+    eng.add_child(frontend)
+    
+    print("OUTPUT:")
+    print(f'   Engineering in org: {"Engineering" in org}')
+    print(f'   Backend in org: {"Backend" in org}')
+    print(f'   Marketing in org: {"Marketing" in org}')
+    print(f'   Backend in backend node: {"Backend" in backend}')
+    
+    # 3. Check for leaf nodes
+    print("\n3. Checking if nodes are leaf nodes:")
+    print("CODE:")
+    print('   # Using TreeNode.is_leaf()')
+    print('   print(f"Is org a leaf: {org.is_leaf()}")')
+    print('   print(f"Is eng a leaf: {eng.is_leaf()}")')
+    print('   print(f"Is backend a leaf: {backend.is_leaf()}")')
+    print()
+    
+    print("OUTPUT:")
+    print(f"   Is org a leaf: {org.is_leaf()}")
+    print(f"   Is eng a leaf: {eng.is_leaf()}")
+    print(f"   Is backend a leaf: {backend.is_leaf()}")
+    
+    # 4. Tree version with is_leaf
+    print("\n4. Tree.is_leaf() for checking nodes in the tree:")
+    print("CODE:")
+    print('   company_tree = Tree(org)')
+    print('   # Check leaf status by node name')
+    print('   print(f"Is Company a leaf: {company_tree.is_leaf("Company")}")')
+    print('   print(f"Is Engineering a leaf: {company_tree.is_leaf("Engineering")}")')
+    print('   print(f"Is Frontend a leaf: {company_tree.is_leaf("Frontend")}")')
+    print('   print(f"Is NonExistent a leaf: {company_tree.is_leaf("NonExistent")}")')
+    print()
+    
+    company_tree = Tree(org)
+    print("OUTPUT:")
+    print(f'   Is Company a leaf: {company_tree.is_leaf("Company")}')
+    print(f'   Is Engineering a leaf: {company_tree.is_leaf("Engineering")}')
+    print(f'   Is Frontend a leaf: {company_tree.is_leaf("Frontend")}')
+    print(f'   Is NonExistent a leaf: {company_tree.is_leaf("NonExistent")}')
+    
+    # 5. Get node summary
+    print("\n5. Getting node summary with statistics:")
+    print("CODE:")
+    print('   summary = org.summary()')
+    print('   print(summary)')
+    print()
+    
+    summary = org.summary()
+    print("OUTPUT:")
+    for line in summary.split('\n'):
+        print(f"   {line}")
+    
+    print("\n6. Key benefits:")
+    print("   - remove_child() works with node references, names, and indices")
+    print("   - 'in' operator searches entire subtree (both TreeNode and Tree)")
+    print("   - is_leaf() tells you if a node has children")
+    print("   - summary() provides statistics about the tree structure")
+
 def copy_examples():
     """Demonstrate copy and deepcopy functionality."""
     print("\n" + "=" * 40)
@@ -366,6 +504,247 @@ def copy_examples():
     print("   - Preserves all tree structure and relationships")
     print("   - Enables safe experimentation without affecting originals")
 
+def json_serialization_example():
+    """Demonstrate JSON save/load functionality."""
+    print("\n" + "=" * 40)
+    print("JSON Serialization Example")
+    print("=" * 40)
+    
+    # 1. Save tree to JSON
+    print("1. Saving a tree to JSON file:")
+    print("CODE:")
+    print('   import tempfile, os')
+    print()
+    print('   # Create a sample tree')
+    print('   root = TreeNode("project", {"name": "MyApp", "version": "1.0"})')
+    print('   backend = TreeNode("backend", {"language": "Python", "port": 8000})')
+    print('   frontend = TreeNode("frontend", {"language": "JavaScript"})')
+    print()
+    print('   root.add_child(backend)')
+    print('   root.add_child(frontend)')
+    print()
+    print('   # Save to JSON')
+    print('   tree = Tree(root)')
+    print('   temp_file = "project_tree.json"  # or use tempfile.NamedTemporaryFile')
+    print('   tree.save_json(temp_file)')
+    print('   print(f"Tree saved to {temp_file}")')
+    print()
+    
+    root = TreeNode("project", {"name": "MyApp", "version": "1.0"})
+    backend = TreeNode("backend", {"language": "Python", "port": 8000})
+    frontend = TreeNode("frontend", {"language": "JavaScript"})
+    
+    root.add_child(backend)
+    root.add_child(frontend)
+    
+    tree = Tree(root)
+    temp_file = "project_tree.json"
+    
+    print("OUTPUT:")
+    try:
+        tree.save_json(temp_file)
+        print(f"   Tree saved to {temp_file}")
+        
+        # 2. Load tree from JSON
+        print("\n2. Loading a tree from JSON file:")
+        print("CODE:")
+        print('   # Load the tree back')
+        print('   loaded_tree = Tree.load_json(temp_file)')
+        print('   print(f"Loaded tree root: {loaded_tree.root.name}")')
+        print('   print(f"Root content: {loaded_tree.root.content}")')
+        print('   print(f"Number of children: {len(loaded_tree.root.children)}")')
+        print()
+        print('   # Access loaded data')
+        print('   backend_subtree = loaded_tree.get("backend")')
+        print('   print(f"Backend port: {backend_subtree.root.content["port"]}")')
+        print()
+        
+        loaded_tree = Tree.load_json(temp_file)
+        print("OUTPUT:")
+        print(f'   Loaded tree root: {loaded_tree.root.name}')
+        print(f'   Root content: {loaded_tree.root.content}')
+        print(f'   Number of children: {len(loaded_tree.root.children)}')
+        
+        backend_subtree = loaded_tree.get("backend")
+        print(f'   Backend port: {backend_subtree.root.content["port"]}')
+        
+        # 3. Show JSON structure
+        print("\n3. Viewing the JSON structure:")
+        with open(temp_file, 'r') as f:
+            json_content = f.read()
+        print("   JSON file contents:")
+        for line in json_content.split('\n')[:10]:
+            print(f"   {line}")
+        if len(json_content.split('\n')) > 10:
+            print("   ...")
+        
+    finally:
+        if os.path.exists(temp_file):
+            os.unlink(temp_file)
+    
+    print("\n4. Use cases for JSON serialization:")
+    print("   - Save tree structures to disk for later use")
+    print("   - Exchange tree data between applications")
+    print("   - Create backups of complex hierarchies")
+    print("   - Configuration files with hierarchical structure")
+    print("   - API responses with tree-like data")
+
+def advanced_indexing_example():
+    """Demonstrate advanced Tree indexing with negative indices and complex queries."""
+    print("\n" + "=" * 40)
+    print("Advanced Indexing & Navigation")
+    print("=" * 40)
+    
+    # 1. Negative indexing
+    print("1. Using negative indices to access from the end:")
+    print("CODE:")
+    print('   # Create a team structure')
+    print('   team = TreeNode("Team", "Development")')
+    print('   members = [')
+    print('       TreeNode("Alice", "Senior Developer"),')
+    print('       TreeNode("Bob", "Developer"),')
+    print('       TreeNode("Carol", "Junior Developer"),')
+    print('       TreeNode("David", "Intern")')
+    print('   ]')
+    print('   for member in members:')
+    print('       team.add_child(member)')
+    print()
+    print('   dev_team = Tree(team)')
+    print()
+    print('   # Get last member (negative index)')
+    print('   last = dev_team[-1]')
+    print('   print(f"Last member: {last.root.name if last else None}")')
+    print()
+    print('   # Get second to last')
+    print('   second_last = dev_team[-2]')
+    print('   print(f"Second to last: {second_last.root.name if second_last else None}")')
+    print()
+    
+    team = TreeNode("Team", "Development")
+    members = [
+        TreeNode("Alice", "Senior Developer"),
+        TreeNode("Bob", "Developer"),
+        TreeNode("Carol", "Junior Developer"),
+        TreeNode("David", "Intern")
+    ]
+    for member in members:
+        team.add_child(member)
+    
+    dev_team = Tree(team)
+    
+    print("OUTPUT:")
+    last = dev_team[-1]
+    print(f"   Last member: {last.root.name if last else None}")
+    
+    second_last = dev_team[-2]
+    print(f"   Second to last: {second_last.root.name if second_last else None}")
+    
+    # 2. Combining slicing with names
+    print("\n2. Combining different index methods:")
+    print("CODE:")
+    print('   # Get all members except the last one')
+    print('   all_except_last = dev_team[:-1]')
+    print('   print(f"All except last: {[t.root.name for t in all_except_last]}")')
+    print()
+    print('   # Get middle members')
+    print('   middle_members = dev_team[1:3]')
+    print('   print(f"Middle members: {[t.root.name for t in middle_members]}")')
+    print()
+    
+    all_except_last = dev_team[:-1]
+    print("OUTPUT:")
+    print(f'   All except last: {[t.root.name for t in all_except_last]}')
+    
+    middle_members = dev_team[1:3]
+    print(f'   Middle members: {[t.root.name for t in middle_members]}')
+    
+    # 3. Complex queries with Tree.contains
+    print("\n3. Complex queries with contains operator:")
+    print("CODE:")
+    print('   # Check multiple conditions')
+    print('   searches = ["Alice", "David", "Emma"]')
+    print('   for name in searches:')
+    print('       found = name in dev_team')
+    print('       print(f"  {name}: {found}")')
+    print()
+    print('   # Find all leaf nodes')
+    print('   leaf_names = []')
+    print('   for i in range(len(dev_team.root.children)):')
+    print('       child_tree = dev_team[i]')
+    print('       if child_tree and dev_team.is_leaf(child_tree.root.name):')
+    print('           leaf_names.append(child_tree.root.name)')
+    print('   print(f"Leaf nodes: {leaf_names}")')
+    print()
+    
+    print("OUTPUT:")
+    searches = ["Alice", "David", "Emma"]
+    for name in searches:
+        found = name in dev_team
+        print(f"   {name}: {found}")
+    
+    leaf_names = []
+    for i in range(len(dev_team.root.children)):
+        child_tree = dev_team[i]
+        if child_tree and dev_team.is_leaf(child_tree.root.name):
+            leaf_names.append(child_tree.root.name)
+    print(f"   Leaf nodes: {leaf_names}")
+    
+    # 4. Tree navigation patterns
+    print("\n4. Practical navigation patterns:")
+    print("CODE:")
+    print('   # Create a nested org structure')
+    print('   org = TreeNode("Company", "TechCorp")')
+    print('   eng = TreeNode("Engineering", "Tech")')
+    print('   backend_team = TreeNode("Backend", "Servers")')
+    print('   frontend_team = TreeNode("Frontend", "UI")')
+    print()
+    print('   org.add_child(eng)')
+    print('   eng.add_child(backend_team)')
+    print('   eng.add_child(frontend_team)')
+    print()
+    print('   org_tree = Tree(org)')
+    print()
+    print('   # Pattern 1: Get department subtree, then access its first team')
+    print('   eng_subtree = org_tree["Engineering"]')
+    print('   first_team = eng_subtree[0]  # Get first team under Engineering')
+    print('   print(f"First team under Engineering: {first_team.root.name}")')
+    print()
+    print('   # Pattern 2: Get all teams under engineering')
+    print('   all_teams = eng_subtree[:]')
+    print('   team_names = [t.root.name for t in all_teams]')
+    print('   print(f"All teams: {team_names}")')
+    print()
+    
+    org = TreeNode("Company", "TechCorp")
+    eng = TreeNode("Engineering", "Tech")
+    backend_team = TreeNode("Backend", "Servers")
+    frontend_team = TreeNode("Frontend", "UI")
+    
+    org.add_child(eng)
+    eng.add_child(backend_team)
+    eng.add_child(frontend_team)
+    
+    org_tree = Tree(org)
+    
+    print("OUTPUT:")
+    eng_subtree = org_tree["Engineering"]
+    first_team = eng_subtree[0]
+    print(f"   First team under Engineering: {first_team.root.name}")
+    
+    all_teams = eng_subtree[:]
+    team_names = [t.root.name for t in all_teams]
+    print(f"   All teams: {team_names}")
+    
+    print("\n5. Key indexing features:")
+    print("   - Supports positive indices: tree[0], tree[1]")
+    print("   - Supports negative indices: tree[-1], tree[-2]")
+    print("   - Supports slicing: tree[1:3], tree[:-1], tree[1:]")
+    print("   - Supports name access: tree['NodeName']")
+    print("   - Supports list of names: tree[['Name1', 'Name2']]")
+    print("   - All operations return Tree objects for easy chaining")
+
+
+
 class Examples():
     def __init__(self):
         pass
@@ -381,6 +760,9 @@ class Examples():
         
         quick_start_example()
         getitem_indexing_example()
+        remove_and_search_example()
+        json_serialization_example()
+        advanced_indexing_example()
         copy_examples()
         
         print("\n" + "=" * 40)
