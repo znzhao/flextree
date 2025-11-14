@@ -731,6 +731,13 @@ python -m flextree.jsonui
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Changelog
+### Version 0.3.1
+- **ENHANCED**: Cut/Copy/Paste/Delete keyboard shortcuts now work during inline node name editing
+- Smart routing for keyboard operations: detects if user is editing node name, content text, or manipulating tree nodes
+- Entry widget focus detection for seamless inline editing experience
+- Support for text selection and deletion in node name fields
+- Maintains full backward compatibility with tree node operations
+
 ### Version 0.3.0
 - **ENHANCED**: ActionMemorySystem for comprehensive undo/redo operations across all tree modifications
 - Advanced Find and Replace functionality with dialog interface and search result navigation

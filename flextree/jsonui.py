@@ -2527,13 +2527,13 @@ Created with FlexTree library."""
         self.root.bind('<Control-e>', lambda e: self._toggle_edit_mode())
         self.root.bind('<Control-E>', lambda e: self._toggle_edit_mode())
         
-        # Clipboard operations
-        self.root.bind('<Control-x>', lambda e: self._cut_node())
-        self.root.bind('<Control-X>', lambda e: self._cut_node())
-        self.root.bind('<Control-c>', lambda e: self._copy_node())
-        self.root.bind('<Control-C>', lambda e: self._copy_node())
-        self.root.bind('<Control-v>', lambda e: self._paste_node())
-        self.root.bind('<Control-V>', lambda e: self._paste_node())
+        # Clipboard operations - these will check edit mode and route accordingly
+        self.root.bind('<Control-x>', lambda e: self._handle_cut())
+        self.root.bind('<Control-X>', lambda e: self._handle_cut())
+        self.root.bind('<Control-c>', lambda e: self._handle_copy())
+        self.root.bind('<Control-C>', lambda e: self._handle_copy())
+        self.root.bind('<Control-v>', lambda e: self._handle_paste())
+        self.root.bind('<Control-V>', lambda e: self._handle_paste())
         self.root.bind('<Control-i>', lambda e: self._insert_new_node())
         self.root.bind('<Control-I>', lambda e: self._insert_new_node())
         
@@ -2544,7 +2544,8 @@ Created with FlexTree library."""
         self.root.bind('<Control-H>', lambda e: self._open_replace_dialog())
         self.root.bind('<Escape>', lambda e: self._close_search_dialogs())
         
-        self.root.bind('<Delete>', lambda e: self._delete_node())
+        # Delete key - routes to text or node based on edit mode
+        self.root.bind('<Delete>', lambda e: self._handle_delete())
     
     def _get_selected_node(self) -> Optional[TreeNode]:
         """Get the currently selected node from the tree viewer."""
@@ -2560,6 +2561,119 @@ Created with FlexTree library."""
         if selection:
             return [self.treeviewer.node_map.get(item_id) for item_id in selection]
         return None
+    
+    def _handle_cut(self):
+        """Handle cut operation - routes to text or node based on edit mode."""
+        if self.infoviewer.is_editing:
+            self._cut_text()
+        else:
+            self._cut_node()
+    
+    def _handle_copy(self):
+        """Handle copy operation - routes to text or node based on edit mode."""
+        if self.infoviewer.is_editing:
+            self._copy_text()
+        else:
+            self._copy_node()
+    
+    def _handle_paste(self):
+        """Handle paste operation - routes to text or node based on edit mode."""
+        if self.infoviewer.is_editing:
+            self._paste_text()
+        else:
+            self._paste_node()
+    
+    def _cut_text(self):
+        """Cut selected text from the content text widget in edit mode."""
+        if not hasattr(self.infoviewer, 'content_text'):
+            return
+        
+        text_widget = self.infoviewer.content_text
+        
+        try:
+            # Get selected text
+            selected_text = text_widget.get(tk.SEL_FIRST, tk.SEL_LAST)
+            
+            if selected_text:
+                # Copy to system clipboard
+                self.root.clipboard_clear()
+                self.root.clipboard_append(selected_text)
+                
+                # Delete the selected text
+                text_widget.delete(tk.SEL_FIRST, tk.SEL_LAST)
+        except tk.TclError:
+            # No selection
+            pass
+    
+    def _copy_text(self):
+        """Copy selected text from the content text widget in edit mode."""
+        if not hasattr(self.infoviewer, 'content_text'):
+            return
+        
+        text_widget = self.infoviewer.content_text
+        
+        try:
+            # Get selected text
+            selected_text = text_widget.get(tk.SEL_FIRST, tk.SEL_LAST)
+            
+            if selected_text:
+                # Copy to system clipboard
+                self.root.clipboard_clear()
+                self.root.clipboard_append(selected_text)
+        except tk.TclError:
+            # No selection
+            pass
+    
+    def _paste_text(self):
+        """Paste text from system clipboard into the content text widget in edit mode."""
+        if not hasattr(self.infoviewer, 'content_text'):
+            return
+        
+        text_widget = self.infoviewer.content_text
+        
+        try:
+            # Get text from system clipboard
+            clipboard_text = self.root.clipboard_get()
+            
+            # Delete selected text if any
+            try:
+                text_widget.delete(tk.SEL_FIRST, tk.SEL_LAST)
+            except tk.TclError:
+                pass
+            
+            # Insert clipboard text at cursor position
+            text_widget.insert(tk.INSERT, clipboard_text)
+        except tk.TclError:
+            # Clipboard is empty or unavailable
+            pass
+    
+    def _handle_delete(self):
+        """Handle delete operation - routes to text or node based on edit mode."""
+        if self.infoviewer.is_editing:
+            self._delete_text()
+        else:
+            self._delete_node()
+    
+    def _delete_text(self):
+        """Delete selected text from the content text widget in edit mode."""
+        if not hasattr(self.infoviewer, 'content_text'):
+            return
+        
+        text_widget = self.infoviewer.content_text
+        
+        try:
+            # Get selected text
+            selected_text = text_widget.get(tk.SEL_FIRST, tk.SEL_LAST)
+            
+            if selected_text:
+                # Delete the selected text
+                text_widget.delete(tk.SEL_FIRST, tk.SEL_LAST)
+        except tk.TclError:
+            # No selection - delete character at cursor
+            try:
+                text_widget.delete(tk.INSERT)
+            except tk.TclError:
+                pass
     
     def _deep_copy_node(self, node: TreeNode) -> TreeNode:
         """Create a deep copy of a TreeNode and all its children."""
